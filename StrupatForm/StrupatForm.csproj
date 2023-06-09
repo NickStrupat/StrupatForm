@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net7.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.0" />
+		<PackageReference Include="Antlr4BuildTasks" Version="12.2.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Antlr4 Include="StrupatForm.g4" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Update="grammar.sf">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </None>
+	</ItemGroup>
+
+</Project>

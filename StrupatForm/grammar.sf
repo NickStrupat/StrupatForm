@@ -1,0 +1,80 @@
+CompilationUnit
+	NamespaceDeclaration
+	TypeDeclaration
+	FunctionDeclaration
+
+NamespaceDeclaration
+	"namespace" QualifiedIdentifier NamespaceBody
+
+NamespaceBody
+	NamespaceDeclaration
+	TypeDeclaration
+	FunctionDeclaration
+
+TypeDeclaration -> "type" Identifier TypeBody
+
+TypeBody
+	TypeDeclaration
+	FunctionDeclaration
+
+FunctionDeclaration -> "function" Identifier FunctionBody
+
+FunctionBody
+	Statement
+
+Statement
+	ExpressionStatement
+	VariableDeclarationStatement
+	AssignmentStatement
+	ReturnStatement
+
+ExpressionStatement
+	Expression
+
+VariableDeclarationStatement
+	"var" Identifier "=" Expression
+
+AssignmentStatement
+	Identifier "=" Expression
+
+ReturnStatement
+	"return" Expression
+
+Expression
+	PrimaryExpression
+	UnaryExpression
+	BinaryExpression
+
+PrimaryExpression
+	Identifier
+	Literal
+
+UnaryExpression
+	UnaryOperator Expression
+
+BinaryExpression
+	Expression BinaryOperator Expression
+
+UnaryOperator
+	"!"
+
+BinaryOperator
+	"&&"
+	"||"
+	"=="
+	"!="
+	"<"
+	"<="
+	">"
+	">="
+	"+"
+	"-"
+	"*"
+	"/"
+	"%"
+
+Literal
+	'"' [^\"] '"'
+
+QualifiedIdentifier -> Identifier ('.' Identifier)*
+Identifier -> \w [\w\d]+
