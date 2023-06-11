@@ -1,5 +1,9 @@
 grammar StrupatForm;
 
+options {
+    contextSuperClass = ParserRuleContextEx;
+}
+
 grammar_: rule_ (Newline+ rule_)* Newline? EOF;
 rule_: Name alternatives;
 alternatives: Space '->' Space alternative | (Newline Indentation alternative)+;
@@ -7,14 +11,16 @@ alternative: item (Space item)*;
 item: (ruleRef | literal | class | '(' alternative ')') quantifier?;
 ruleRef: Name;
 literal: CharLiteral | StringLiteral;
-quantifier
-	: '?' #optional
-	| '*' #zeroOrMore
-	| '+' #oneOrMore
-	| '{' Number '}' #exact
-	| '{' Number ',' '}' #min
-	| '{' Number ',' Number '}' #minMax
-	;
+
+quantifier: zeroOrOne | zeroOrMany | oneOrMany | exactly | atLeast | between;
+
+zeroOrOne: '?';
+zeroOrMany: '*';
+oneOrMany: '+';
+exactly: '{' Number '}';
+atLeast: '{' min=Number ',' '}';
+between: '{' min=Number ',' max=Number '}';
+
 class
 	: '[' not='^'? range+ ']'
 	| range

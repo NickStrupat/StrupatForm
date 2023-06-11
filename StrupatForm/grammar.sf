@@ -20,7 +20,11 @@ TypeBody
 FunctionDeclaration -> "function" Identifier FunctionBody
 
 FunctionBody
-	Statement
+    Statement
+	BodyElement+
+
+BodyElement
+    Statement ';'
 
 Statement
 	ExpressionStatement

@@ -5,6 +5,7 @@
 		<TargetFramework>net7.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
+		<WarningsAsErrors>Nullable</WarningsAsErrors>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -13,7 +14,9 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <Antlr4 Include="StrupatForm.g4" />
+	  <Antlr4 Include="StrupatForm.g4">
+		  <Package>StrupatForm</Package>
+	  </Antlr4>
 	</ItemGroup>
 
 	<ItemGroup>
