@@ -1,7 +1,7 @@
 grammar StrupatForm;
 
 options {
-    contextSuperClass = ParserRuleContextEx;
+	contextSuperClass = ParserRuleContextEx;
 }
 
 grammar_: rule_ (Newline+ rule_)* Newline? EOF;
@@ -37,21 +37,19 @@ ShorthandCharacterClass: Word | Digit | Whitespace | NotWord | NotDigit | NotWhi
 //Custom: '[' ~[\]]+ ']';
 Newline: '\r' | '\n' | '\r\n';
 Indentation: '\t' | '    ';
-CharLiteral: '\'' (EscapedCharacter | ~'\'') '\'';
-StringLiteral: '"' (EscapedCharacter | ~'"')* '"';
-fragment EscapedCharacter
-	: '\\' [0\\tnr"']
-	| '\\x' HexadecimalDigit2
-	| '\\u' '{' HexadecimalDigit4 '}'
-	| '\\u' '{' HexadecimalDigit8 '}'
+CharLiteral: '\'' (EscapedCharacter | UnicodeEscapeCharacter | ~'\'') '\'';
+StringLiteral: '"' (EscapedCharacter | UnicodeEscapeCharacter | ~'"')* '"';
+fragment EscapedCharacter: '\\' [0\\tnr"'];
+fragment UnicodeEscapeCharacter
+	: '\\x{' Hexadec Hexadec? Hexadec? Hexadec? Hexadec? Hexadec? Hexadec? Hexadec? '}'
+	| '\\u' Hexadec Hexadec Hexadec Hexadec
+	| '\\U' Hexadec Hexadec Hexadec Hexadec Hexadec Hexadec Hexadec Hexadec
 	;
-fragment HexadecimalDigit: [0-9a-fA-F];
-fragment HexadecimalDigit2: HexadecimalDigit HexadecimalDigit;
-fragment HexadecimalDigit4: HexadecimalDigit2 HexadecimalDigit2;
-fragment HexadecimalDigit8: HexadecimalDigit4 HexadecimalDigit4;
+fragment Hexadec: [0-9a-fA-F];
 Name: [\p{Alpha}\p{General_Category=Other_Letter}] [\p{Alnum}\p{General_Category=Other_Letter}]*;
 Space : ' ';
 Number: [\p{Decimal_Number}]+;
+Letter: [\p{Alpha}];
 
 range: Character '-' Character | Character | ShorthandCharacterClass;
-Character: EscapedCharacter | ~( '[' | ']' | '-' | '\\' );
+Character: Letter | Number | EscapedCharacter | ~( '[' | ']' | '-' | '\\' );

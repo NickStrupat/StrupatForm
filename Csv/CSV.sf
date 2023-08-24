@@ -1,0 +1,15 @@
+File
+	Row+
+
+Row
+	Field (',' Field)* '\n'
+
+Field
+	Quoted
+	Simple
+
+QuotedField
+	`"((\"\"|[^"])*)"`
+
+SimpleField
+	`[^,\n\r"]+`

@@ -20,11 +20,11 @@ TypeBody
 FunctionDeclaration -> "function" Identifier FunctionBody
 
 FunctionBody
-    Statement
+	Statement
 	BodyElement+
 
 BodyElement
-    Statement ';'
+	Statement ';'
 
 Statement
 	ExpressionStatement
@@ -79,6 +79,8 @@ BinaryOperator
 
 Literal
 	'"' [^\"] '"'
+	[0-9] [0-9]*
+	'0' [xX] [0-9a-fA-F]+
 
 QualifiedIdentifier -> Identifier ('.' Identifier)*
 Identifier -> \w [\w\d]+

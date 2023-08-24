@@ -9,24 +9,6 @@ static class ParserRuleExtensions
 {
 	public static TTo To<TTo>(this IParseTree o) where TTo : IParseTree => (TTo) o;
 
-	public static TAncestor? FindAncestor<TAncestor>(this RuleContext context) where TAncestor : RuleContext
-	{
-		while (context.Parent is not null)
-			if (context.Parent is TAncestor ancestor)
-				return ancestor;
-			else
-				context = context.Parent;
-		return null;
-	}
-
-	public static Rule_Context? GetRuleContext(this RuleRefContext context)
-	{
-		var grammarContext = context.FindAncestor<Grammar_Context>();
-		if (grammarContext is null)
-			return null;
-		return grammarContext.RuleLookup.TryGetValue(context.Name().GetText(), out var rule) ? rule : null;
-	}
-
 	public static Grammar ToGrammar(this Grammar_Context context)
 	{
 		var grammar = new Grammar();
@@ -86,8 +68,8 @@ static class ParserRuleExtensions
 		var terminalNode = context.children.Single().To<ITerminalNode>();
 		var (isChar, unescaped) = terminalNode.Symbol.Type switch
 		{
-			CharLiteral => (true, context.CharLiteral().GetText()[1..^1].Unescape()),
-			StringLiteral => (false, context.StringLiteral().GetText()[1..^1].Unescape()),
+			CharLiteral => (true, context.CharLiteral().GetText()[1..^1].ToUnescaped()),
+			StringLiteral => (false, context.StringLiteral().GetText()[1..^1].ToUnescaped()),
 			_ => throw new("Unknown literal type: " + DefaultVocabulary.GetDisplayName(terminalNode.Symbol.Type))
 		};
 		return isChar
@@ -109,7 +91,7 @@ static class ParserRuleExtensions
 			return new RegexCharacterRange {Pattern = scc.Symbol.Text};
 		var from = context.Character().First().Symbol.Text.Unescape().Single();
 		var to = context.Character().Last().Symbol.Text.Unescape().Single();
-		return new CharacterRange {From = from, To = to};
+		return new CharacterRange {From = (Rune)from, To = (Rune)to};
 	}
 
 	public static Quantifier ToQuantifier(this QuantifierContext? context)
@@ -155,7 +137,7 @@ static class ParserRuleExtensions
 		return unescaped != first;
 	}
 
-	private static String Unescape(this String text)
+	public static String Unescape(this String text)
 	{
 		var unescaped = new StringBuilder(text.Length);
 		for (var i = 0; i < text.Length; i++)
