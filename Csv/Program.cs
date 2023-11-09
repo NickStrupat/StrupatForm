@@ -70,11 +70,13 @@ public readonly ref struct Row
 	public Row(ReadOnlySpan<Char> input)
 	{
 		this.input = input;
-		Field = new(input);
+		Field = new(this.input);
 		Length = Field.Length;
 	}
 
 	public FieldEnumerable Field { get; }
+
+	public ReadOnlySpan<Char> Text => input[..Length];
 	public Int32 Length { get; }
 }
 

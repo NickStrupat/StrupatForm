@@ -13,11 +13,11 @@ static class ParserRuleExtensions
 	{
 		var grammar = new Grammar();
 		foreach (var ruleCtx in context.rule_())
-			if (!grammar.Rules.Add(new Rule { Name = ruleCtx.Name().GetText() }))
-				throw new Exception($"Rule `{ruleCtx.Name().GetText()}` defined multiple times");
+			if (!grammar.Rules.Add(new Rule { Name = ruleCtx.name().GetText() }))
+				throw new Exception($"Rule `{ruleCtx.name().GetText()}` defined multiple times");
 		foreach (var ruleCtx in context.rule_())
 		{
-			var name = ruleCtx.Name().GetText();
+			var name = ruleCtx.name().GetText();
 			var rule = grammar.Rules.Get(name);
 			foreach (var alternativeCtx in ruleCtx.alternatives().alternative())
 				rule.Alternatives.Add(alternativeCtx.ToAlternative(grammar));
@@ -28,7 +28,7 @@ static class ParserRuleExtensions
 
 	public static Rule ToRule(this Rule_Context context, Grammar grammar)
 	{
-		var rule = new Rule {Name = context.Name().GetText()};
+		var rule = new Rule {Name = context.name().GetText()};
 		foreach (var alternative in context.alternatives().alternative())
 			rule.Alternatives.Add(alternative.ToAlternative(grammar));
 		return rule;
@@ -58,7 +58,7 @@ static class ParserRuleExtensions
 
 	public static RuleRef ToRuleRef(this RuleRefContext context, Grammar grammar, Quantifier quantifier)
 	{
-		var name = context.Name().GetText();
+		var name = context.name().GetText();
 		var rule = grammar.Rules.Get(name);
 		return new RuleRef {Name = name, Rule = rule, Quantifier = quantifier};
 	}
@@ -89,8 +89,8 @@ static class ParserRuleExtensions
 	{
 		if (context.ShorthandCharacterClass() is { } scc)
 			return new RegexCharacterRange {Pattern = scc.Symbol.Text};
-		var from = context.Character().First().Symbol.Text.Unescape().Single();
-		var to = context.Character().Last().Symbol.Text.Unescape().Single();
+		var from = context.character().First().GetText().Unescape().Single();
+		var to = context.character().Last().GetText().Unescape().Single();
 		return new CharacterRange {From = (Rune)from, To = (Rune)to};
 	}
 

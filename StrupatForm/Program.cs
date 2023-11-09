@@ -20,7 +20,7 @@ var text = File.ReadAllText(path);
 var stream = new CodePointCharStream(text) {name = path};
 var lexer = new StrupatFormLexer(stream);
 var tokens = new CommonTokenStream(lexer);
-Console.WriteLine(string.Join('\n', lexer.GetAllTokens().Where(x => !String.IsNullOrWhiteSpace(x.Text)).Select(x => $"{GetName(x),-20}{x.Text}")));
+//Console.WriteLine(string.Join('\n', lexer.GetAllTokens().Where(x => !String.IsNullOrWhiteSpace(x.Text)).Select(x => $"{GetName(x),-20}{x.Text}")));
 var parser = new StrupatFormParser(tokens);
 var grammarCtx = parser.grammar_();
 var grammar = grammarCtx.ToGrammar();
@@ -167,4 +167,30 @@ public static partial class Regexes
 public static class RangeExtensions
 {
 	public static Int32 Length(in this Range range) => range.End.Value - range.Start.Value;
+}
+
+public ref struct SourceText
+{
+	public Int32 Index { get; }
+	public Int32 Length { get; }
+	public ReadOnlySpan<Char> Text { get; }
+
+	public SourceText(Int32 index, Int32 length, ReadOnlySpan<Char> text)
+	{
+		Index = index;
+		Length = length;
+		Text = text;
+	}
+
+	public Match TryMatch(Char c)
+	{
+		if (Text[0] == c)
+			return new Match();
+		return default;
+	}
+}
+
+public readonly ref struct Match
+{
+	private readonly ReadOnlySpan<Char> input;
 }

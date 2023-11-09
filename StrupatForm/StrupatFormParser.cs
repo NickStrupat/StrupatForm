@@ -7,7 +7,7 @@ public partial class StrupatFormParser
 	public partial class Grammar_Context
 	{
 		private ImmutableDictionary<String, Rule_Context>? ruleLookup;
-		public ImmutableDictionary<String, Rule_Context> RuleLookup => ruleLookup ??= rule_().ToImmutableDictionary(x => x.Name().GetText());
+		public ImmutableDictionary<String, Rule_Context> RuleLookup => ruleLookup ??= rule_().ToImmutableDictionary(x => x.name().GetText());
 	}
 
 	// partial class RuleRefContext

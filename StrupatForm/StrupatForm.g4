@@ -5,11 +5,12 @@ options {
 }
 
 grammar_: rule_ (Newline+ rule_)* Newline? EOF;
-rule_: Name alternatives;
+rule_: name alternatives;
+name: (Letter | OtherLetter) (Letter | OtherLetter | Number)*;
 alternatives: Space '->' Space alternative | (Newline Indentation alternative)+;
 alternative: item (Space item)*;
 item: (ruleRef | literal | class | '(' alternative ')') quantifier?;
-ruleRef: Name;
+ruleRef: name;
 literal: CharLiteral | StringLiteral;
 
 quantifier: zeroOrOne | zeroOrMany | oneOrMany | exactly | atLeast | between;
@@ -39,17 +40,17 @@ Newline: '\r' | '\n' | '\r\n';
 Indentation: '\t' | '    ';
 CharLiteral: '\'' (EscapedCharacter | UnicodeEscapeCharacter | ~'\'') '\'';
 StringLiteral: '"' (EscapedCharacter | UnicodeEscapeCharacter | ~'"')* '"';
-fragment EscapedCharacter: '\\' [0\\tnr"'];
+EscapedCharacter: '\\' [0\\tnr"'];
 fragment UnicodeEscapeCharacter
 	: '\\x{' Hexadec Hexadec? Hexadec? Hexadec? Hexadec? Hexadec? Hexadec? Hexadec? '}'
 	| '\\u' Hexadec Hexadec Hexadec Hexadec
 	| '\\U' Hexadec Hexadec Hexadec Hexadec Hexadec Hexadec Hexadec Hexadec
 	;
 fragment Hexadec: [0-9a-fA-F];
-Name: [\p{Alpha}\p{General_Category=Other_Letter}] [\p{Alnum}\p{General_Category=Other_Letter}]*;
 Space : ' ';
 Number: [\p{Decimal_Number}]+;
 Letter: [\p{Alpha}];
+OtherLetter: [\p{General_Category=Other_Letter}];
 
-range: Character '-' Character | Character | ShorthandCharacterClass;
-Character: Letter | Number | EscapedCharacter | ~( '[' | ']' | '-' | '\\' );
+range: character '-' character | character | ShorthandCharacterClass;
+character: Letter | Number | EscapedCharacter | ~( '[' | ']' | '-' | '\\' );

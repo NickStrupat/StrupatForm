@@ -13,7 +13,7 @@ public static class StringExtensions
 	{
 		return EscapeRegex.Replace(text, MatchEvaluator);
 
-		static String MatchEvaluator(Match m) =>
+		static String MatchEvaluator(System.Text.RegularExpressions.Match m) =>
 			m.Groups[1].Value switch
 			{
 				"0" => "\0",

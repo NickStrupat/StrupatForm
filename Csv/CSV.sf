@@ -1,5 +1,5 @@
 File
-	Row+
+	Row*
 
 Row
 	Field (',' Field)* '\n'
@@ -9,7 +9,7 @@ Field
 	Simple
 
 QuotedField
-	`"((\"\"|[^"])*)"`
+	/"((\"\"|[^"])*)"/
 
 SimpleField
-	`[^,\n\r"]+`
+	/[^,\n\r"]+/
