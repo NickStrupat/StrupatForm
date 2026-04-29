@@ -4,20 +4,20 @@ CompilationUnit
 	FunctionDeclaration
 
 NamespaceDeclaration
-	"namespace" QualifiedIdentifier NamespaceBody
+	"namespace" QualifiedIdentifier "{" NamespaceBody "}"
 
 NamespaceBody
 	NamespaceDeclaration
 	TypeDeclaration
 	FunctionDeclaration
 
-TypeDeclaration -> "type" Identifier TypeBody
+TypeDeclaration -> "type" Identifier "{" TypeBody "}"
 
 TypeBody
 	TypeDeclaration
 	FunctionDeclaration
 
-FunctionDeclaration -> "function" Identifier FunctionBody
+FunctionDeclaration -> "function" Identifier "{" FunctionBody "}"
 
 FunctionBody
 	Statement
