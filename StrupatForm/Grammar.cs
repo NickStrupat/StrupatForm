@@ -1116,7 +1116,6 @@ public readonly ref struct Literal : IRule
 {
     private readonly Input input;
     public Int32 Length { get; }
-    private readonly Byte index;
 
     public Literal(Input input)
     {
@@ -1127,7 +1126,6 @@ public readonly ref struct Literal : IRule
             if (end < 0)
                 throw new ParseException(new ParseError());
             Length = end + 2;
-            index = 1;
         }
         else if (input.Length > 1 && input[0] == '0' && (input[1] == 'x' || input[1] == 'X'))
         {
@@ -1137,7 +1135,6 @@ public readonly ref struct Literal : IRule
             if (i == 2)
                 throw new ParseException(new ParseError());
             Length = i;
-            index = 3;
         }
         else if (input.Length > 0 && Char.IsAsciiDigit(input[0]))
         {
@@ -1145,7 +1142,6 @@ public readonly ref struct Literal : IRule
             while (i < input.Length && Char.IsAsciiDigit(input[i]))
                 i++;
             Length = i;
-            index = 2;
         }
         else
         {
@@ -1155,59 +1151,10 @@ public readonly ref struct Literal : IRule
 
     public Input Text => input[..Length];
 
-    public void VisitChildren<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct
-    {
-        switch (index)
-        {
-            case 1: visitor.Visit(new StringLiteral(input[..Length])); break;
-            case 2: visitor.Visit(new DecimalLiteral(input[..Length])); break;
-            case 3: visitor.Visit(new HexLiteral(input[..Length])); break;
-        }
-    }
-
-    public void Visit<T>(T visitor) where T : IVisitor
-    {
-        switch (index)
-        {
-            case 0: throw new UninitializedInstanceException();
-            case 1: visitor.Visit(new StringLiteral(input[..Length])); break;
-            case 2: visitor.Visit(new DecimalLiteral(input[..Length])); break;
-            case 3: visitor.Visit(new HexLiteral(input[..Length])); break;
-            default: throw new ArgumentOutOfRangeException(nameof(index));
-        }
-    }
-
-    public interface IVisitor
-    {
-        void Visit(in StringLiteral stringLiteral);
-        void Visit(in DecimalLiteral decimalLiteral);
-        void Visit(in HexLiteral hexLiteral);
-    }
+    public void VisitChildren<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct { }
 
     private static Boolean IsHexDigit(Char c) =>
         Char.IsAsciiDigit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
-}
-
-public readonly ref struct StringLiteral : IRule
-{
-    public StringLiteral(Input input) => Text = input;
-    public Input Text { get; }
-    public Input Value => Text[1..^1];
-    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }
-}
-
-public readonly ref struct DecimalLiteral : IRule
-{
-    public DecimalLiteral(Input input) => Text = input;
-    public Input Text { get; }
-    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }
-}
-
-public readonly ref struct HexLiteral : IRule
-{
-    public HexLiteral(Input input) => Text = input;
-    public Input Text { get; }
-    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }
 }
 
 // QualifiedIdentifier -> Identifier ('.' Identifier)*
