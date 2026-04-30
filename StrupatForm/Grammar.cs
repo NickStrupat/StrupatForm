@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using Input = System.ReadOnlySpan<System.Char>;
 
 namespace ExampleOfGeneratedParser;
@@ -10,6 +9,17 @@ public sealed class ParseException(ParseError error) : Exception
 }
 
 public sealed class UninitializedInstanceException() : Exception("Instance uninitialized");
+
+public interface IRule
+{
+    Input Text { get; }
+    void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct;
+}
+
+public interface IVisitor
+{
+    void Visit<T>(T rule) where T : IRule, allows ref struct;
+}
 
 // Grammar -> CompilationUnit
 public readonly struct Grammar(Range range)
@@ -33,7 +43,7 @@ public readonly struct Grammar(Range range)
 //     NamespaceDeclaration
 //     TypeDeclaration
 //     FunctionDeclaration
-public readonly ref struct CompilationUnit
+public readonly ref struct CompilationUnit : IRule
 {
     private readonly Input input;
     private readonly Byte index;
@@ -66,6 +76,17 @@ public readonly ref struct CompilationUnit
     }
 
     public Int32 Length { get; }
+    public Input Text => input[..Length];
+
+    public void VisitChildren<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct
+    {
+        switch (index)
+        {
+            case 1: visitor.Visit(new NamespaceDeclaration(input)); break;
+            case 2: visitor.Visit(new TypeDeclaration(input)); break;
+            case 3: visitor.Visit(new FunctionDeclaration(input)); break;
+        }
+    }
 
     public void Visit<T>(T visitor) where T : IVisitor
     {
@@ -90,7 +111,7 @@ public readonly ref struct CompilationUnit
 }
 
 // NamespaceDeclaration -> "namespace" QualifiedIdentifier "{" NamespaceBody "}"
-public readonly ref struct NamespaceDeclaration
+public readonly ref struct NamespaceDeclaration : IRule
 {
     private readonly Input input;
     private readonly Int32 nameStart;
@@ -127,6 +148,12 @@ public readonly ref struct NamespaceDeclaration
     public NamespaceBody Body => new(input[bodyStart..]);
     public Input Text => input[..Length];
 
+    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
+    {
+        visitor.Visit(Name);
+        visitor.Visit(Body);
+    }
+
     private static Int32 SkipWhitespace(Input input)
     {
         var i = 0;
@@ -140,7 +167,7 @@ public readonly ref struct NamespaceDeclaration
 //     NamespaceDeclaration
 //     TypeDeclaration
 //     FunctionDeclaration
-public readonly ref struct NamespaceBody
+public readonly ref struct NamespaceBody : IRule
 {
     private readonly Input input;
     private readonly Byte index;
@@ -174,6 +201,18 @@ public readonly ref struct NamespaceBody
         }
     }
 
+    public Input Text => input[..Length];
+
+    public void VisitChildren<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct
+    {
+        switch (index)
+        {
+            case 1: visitor.Visit(new NamespaceDeclaration(input)); break;
+            case 2: visitor.Visit(new TypeDeclaration(input)); break;
+            case 3: visitor.Visit(new FunctionDeclaration(input)); break;
+        }
+    }
+
     public void Visit<T>(T visitor) where T : IVisitor
     {
         switch (index)
@@ -197,7 +236,7 @@ public readonly ref struct NamespaceBody
 }
 
 // TypeDeclaration -> "type" Identifier "{" TypeBody "}"
-public readonly ref struct TypeDeclaration
+public readonly ref struct TypeDeclaration : IRule
 {
     private readonly Input input;
     private readonly Int32 nameStart;
@@ -234,6 +273,12 @@ public readonly ref struct TypeDeclaration
     public TypeBody Body => new(input[bodyStart..]);
     public Input Text => input[..Length];
 
+    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
+    {
+        visitor.Visit(Name);
+        visitor.Visit(Body);
+    }
+
     private static Int32 SkipWhitespace(Input input)
     {
         var i = 0;
@@ -246,7 +291,7 @@ public readonly ref struct TypeDeclaration
 // TypeBody
 //     TypeDeclaration
 //     FunctionDeclaration
-public readonly ref struct TypeBody
+public readonly ref struct TypeBody : IRule
 {
     private readonly Input input;
     private readonly Byte index;
@@ -274,6 +319,17 @@ public readonly ref struct TypeBody
         }
     }
 
+    public Input Text => input[..Length];
+
+    public void VisitChildren<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct
+    {
+        switch (index)
+        {
+            case 1: visitor.Visit(new TypeDeclaration(input)); break;
+            case 2: visitor.Visit(new FunctionDeclaration(input)); break;
+        }
+    }
+
     public void Visit<T>(T visitor) where T : IVisitor
     {
         switch (index)
@@ -295,7 +351,7 @@ public readonly ref struct TypeBody
 }
 
 // FunctionDeclaration -> "function" Identifier "{" FunctionBody "}"
-public readonly ref struct FunctionDeclaration
+public readonly ref struct FunctionDeclaration : IRule
 {
     private readonly Input input;
     private readonly Int32 nameStart;
@@ -332,6 +388,12 @@ public readonly ref struct FunctionDeclaration
     public FunctionBody Body => new(input[bodyStart..]);
     public Input Text => input[..Length];
 
+    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
+    {
+        visitor.Visit(Name);
+        visitor.Visit(Body);
+    }
+
     private static Int32 SkipWhitespace(Input input)
     {
         var i = 0;
@@ -344,7 +406,7 @@ public readonly ref struct FunctionDeclaration
 // FunctionBody
 //     Statement       (single statement, no semicolon)
 //     BodyElement+    (one or more statements each followed by ';')
-public readonly ref struct FunctionBody
+public readonly ref struct FunctionBody : IRule
 {
     private readonly Input input;
     private readonly Byte index;
@@ -383,6 +445,21 @@ public readonly ref struct FunctionBody
         }
     }
 
+    public Input Text => input[..Length];
+
+    public void VisitChildren<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct
+    {
+        if (index == 1)
+        {
+            visitor.Visit(new Statement(input));
+        }
+        else if (index == 2)
+        {
+            foreach (var elem in new BodyElementEnumerable(input[..Length]))
+                visitor.Visit(elem);
+        }
+    }
+
     public void Visit<T>(T visitor) where T : IVisitor
     {
         switch (index)
@@ -412,7 +489,7 @@ public readonly ref struct FunctionBody
 }
 
 // BodyElement -> Statement ';'
-public readonly ref struct BodyElement
+public readonly ref struct BodyElement : IRule
 {
     private readonly Input input;
     public Int32 Length { get; }
@@ -431,6 +508,11 @@ public readonly ref struct BodyElement
 
     public Statement Statement => new(input);
     public Input Text => input[..Length];
+
+    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
+    {
+        visitor.Visit(Statement);
+    }
 
     private static Int32 SkipWhitespace(Input input)
     {
@@ -493,7 +575,7 @@ public readonly ref struct BodyElementEnumerable
 //     VariableDeclarationStatement
 //     AssignmentStatement
 //     ReturnStatement
-public readonly ref struct Statement
+public readonly ref struct Statement : IRule
 {
     private readonly Input input;
     private readonly Byte index;
@@ -531,6 +613,19 @@ public readonly ref struct Statement
         }
     }
 
+    public Input Text => input[..Length];
+
+    public void VisitChildren<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct
+    {
+        switch (index)
+        {
+            case 1: visitor.Visit(new ExpressionStatement(input)); break;
+            case 2: visitor.Visit(new VariableDeclarationStatement(input)); break;
+            case 3: visitor.Visit(new AssignmentStatement(input)); break;
+            case 4: visitor.Visit(new ReturnStatement(input)); break;
+        }
+    }
+
     public void Visit<T>(T visitor) where T : IVisitor
     {
         switch (index)
@@ -556,7 +651,7 @@ public readonly ref struct Statement
 }
 
 // ExpressionStatement -> Expression
-public readonly ref struct ExpressionStatement
+public readonly ref struct ExpressionStatement : IRule
 {
     private readonly Input input;
     public Int32 Length { get; }
@@ -570,10 +665,15 @@ public readonly ref struct ExpressionStatement
 
     public Expression Expression => new(input);
     public Input Text => input[..Length];
+
+    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
+    {
+        visitor.Visit(Expression);
+    }
 }
 
 // VariableDeclarationStatement -> "var" Identifier "=" Expression
-public readonly ref struct VariableDeclarationStatement
+public readonly ref struct VariableDeclarationStatement : IRule
 {
     private readonly Input input;
     private readonly Int32 nameStart;
@@ -606,6 +706,12 @@ public readonly ref struct VariableDeclarationStatement
     public Expression Value => new(input[expressionStart..]);
     public Input Text => input[..Length];
 
+    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
+    {
+        visitor.Visit(Name);
+        visitor.Visit(Value);
+    }
+
     private static Int32 SkipWhitespace(Input input)
     {
         var i = 0;
@@ -616,7 +722,7 @@ public readonly ref struct VariableDeclarationStatement
 }
 
 // AssignmentStatement -> Identifier "=" Expression
-public readonly ref struct AssignmentStatement
+public readonly ref struct AssignmentStatement : IRule
 {
     private readonly Input input;
     private readonly Int32 expressionStart;
@@ -643,6 +749,12 @@ public readonly ref struct AssignmentStatement
     public Expression Value => new(input[expressionStart..]);
     public Input Text => input[..Length];
 
+    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
+    {
+        visitor.Visit(Target);
+        visitor.Visit(Value);
+    }
+
     private static Int32 SkipWhitespace(Input input)
     {
         var i = 0;
@@ -653,7 +765,7 @@ public readonly ref struct AssignmentStatement
 }
 
 // ReturnStatement -> "return" Expression
-public readonly ref struct ReturnStatement
+public readonly ref struct ReturnStatement : IRule
 {
     private readonly Input input;
     private readonly Int32 expressionStart;
@@ -676,6 +788,11 @@ public readonly ref struct ReturnStatement
     public Expression Expression => new(input[expressionStart..]);
     public Input Text => input[..Length];
 
+    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
+    {
+        visitor.Visit(Expression);
+    }
+
     private static Int32 SkipWhitespace(Input input)
     {
         var i = 0;
@@ -689,7 +806,7 @@ public readonly ref struct ReturnStatement
 //     PrimaryExpression
 //     UnaryExpression
 //     BinaryExpression
-public readonly ref struct Expression
+public readonly ref struct Expression : IRule
 {
     private readonly Input input;
     private readonly Byte index;
@@ -727,6 +844,39 @@ public readonly ref struct Expression
         }
     }
 
+    public Input Text => input[..Length];
+
+    public void VisitChildren<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct
+    {
+        switch (index)
+        {
+            case 1: visitor.Visit(new PrimaryExpression(input)); break;
+            case 2: visitor.Visit(new UnaryExpression(input)); break;
+            case 3: visitor.Visit(new BinaryExpression(input, leftLength)); break;
+        }
+    }
+
+    public void Visit<T>(T visitor) where T : IVisitor
+    {
+        switch (index)
+        {
+            case 0: throw new UninitializedInstanceException();
+            case 1: visitor.Visit(new PrimaryExpression(input)); break;
+            case 2: visitor.Visit(new UnaryExpression(input)); break;
+            case 3: visitor.Visit(new BinaryExpression(input, leftLength)); break;
+            case Byte.MaxValue: visitor.Visit(new ParseError()); break;
+            default: throw new ArgumentOutOfRangeException(nameof(index));
+        }
+    }
+
+    public interface IVisitor
+    {
+        void Visit(in ParseError parseError);
+        void Visit(in PrimaryExpression primaryExpression);
+        void Visit(in UnaryExpression unaryExpression);
+        void Visit(in BinaryExpression binaryExpression);
+    }
+
     private static Int32 SkipWhitespace(Input input)
     {
         var i = 0;
@@ -751,33 +901,12 @@ public readonly ref struct Expression
         }
         return false;
     }
-
-    public void Visit<T>(T visitor) where T : IVisitor
-    {
-        switch (index)
-        {
-            case 0: throw new UninitializedInstanceException();
-            case 1: visitor.Visit(new PrimaryExpression(input)); break;
-            case 2: visitor.Visit(new UnaryExpression(input)); break;
-            case 3: visitor.Visit(new BinaryExpression(input, leftLength)); break;
-            case Byte.MaxValue: visitor.Visit(new ParseError()); break;
-            default: throw new ArgumentOutOfRangeException(nameof(index));
-        }
-    }
-
-    public interface IVisitor
-    {
-        void Visit(in ParseError parseError);
-        void Visit(in PrimaryExpression primaryExpression);
-        void Visit(in UnaryExpression unaryExpression);
-        void Visit(in BinaryExpression binaryExpression);
-    }
 }
 
 // PrimaryExpression
 //     Identifier
 //     Literal
-public readonly ref struct PrimaryExpression
+public readonly ref struct PrimaryExpression : IRule
 {
     private readonly Input input;
     private readonly Byte index;
@@ -797,6 +926,17 @@ public readonly ref struct PrimaryExpression
             var id = new Identifier(input);
             index = 1;
             Length = id.Length;
+        }
+    }
+
+    public Input Text => input[..Length];
+
+    public void VisitChildren<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct
+    {
+        switch (index)
+        {
+            case 1: visitor.Visit(new Identifier(input)); break;
+            case 2: visitor.Visit(new Literal(input)); break;
         }
     }
 
@@ -821,7 +961,7 @@ public readonly ref struct PrimaryExpression
 }
 
 // UnaryExpression -> UnaryOperator Expression
-public readonly ref struct UnaryExpression
+public readonly ref struct UnaryExpression : IRule
 {
     private readonly Input input;
     private readonly Int32 expressionStart;
@@ -845,6 +985,12 @@ public readonly ref struct UnaryExpression
     public Expression Operand => new(input[expressionStart..]);
     public Input Text => input[..Length];
 
+    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
+    {
+        visitor.Visit(Operator);
+        visitor.Visit(Operand);
+    }
+
     private static Int32 SkipWhitespace(Input input)
     {
         var i = 0;
@@ -855,8 +1001,7 @@ public readonly ref struct UnaryExpression
 }
 
 // BinaryExpression -> Expression BinaryOperator Expression
-// Left-hand side length is passed in to avoid left-recursion in Expression
-public readonly ref struct BinaryExpression
+public readonly ref struct BinaryExpression : IRule
 {
     private readonly Input input;
     private readonly Int32 leftLength;
@@ -895,10 +1040,16 @@ public readonly ref struct BinaryExpression
         Length = pos;
     }
 
-    public Expression Left => new(input);
+    public Expression Left => new(input[..leftLength]);
     public BinaryOperator Operator => new(operatorStart..(operatorStart + operatorLength));
     public Expression Right => new(input[rightStart..]);
     public Input Text => input[..Length];
+
+    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
+    {
+        visitor.Visit(Left);
+        visitor.Visit(Right);
+    }
 
     private static Int32 SkipWhitespace(Input input)
     {
@@ -910,15 +1061,19 @@ public readonly ref struct BinaryExpression
 }
 
 // UnaryOperator -> "!"
-public readonly ref struct UnaryOperator(Input input)
+public readonly ref struct UnaryOperator : IRule
 {
-    public Input Text { get; } = input;
+    public UnaryOperator(Input input) => Text = input[..1];
+
+    public Input Text { get; }
+
+    public void VisitChildren<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct { }
 
     public static void Parse<T>(Input input, T visitor) where T : IVisitor
     {
         switch (input)
         {
-            case "!": visitor.Visit(new UnaryOperator(input[..1])); break;
+            case "!": visitor.Visit(new UnaryOperator(input)); break;
             default: visitor.Visit(new ParseError()); break;
         }
     }
@@ -957,7 +1112,7 @@ public readonly struct BinaryOperator(Range range)
 //     '"' [^\"] '"'
 //     [0-9] [0-9]*
 //     '0' [xX] [0-9a-fA-F]+
-public readonly ref struct Literal
+public readonly ref struct Literal : IRule
 {
     private readonly Input input;
     public Int32 Length { get; }
@@ -998,6 +1153,18 @@ public readonly ref struct Literal
         }
     }
 
+    public Input Text => input[..Length];
+
+    public void VisitChildren<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct
+    {
+        switch (index)
+        {
+            case 1: visitor.Visit(new StringLiteral(input[..Length])); break;
+            case 2: visitor.Visit(new DecimalLiteral(input[..Length])); break;
+            case 3: visitor.Visit(new HexLiteral(input[..Length])); break;
+        }
+    }
+
     public void Visit<T>(T visitor) where T : IVisitor
     {
         switch (index)
@@ -1010,8 +1177,6 @@ public readonly ref struct Literal
         }
     }
 
-    public Input Text => input[..Length];
-
     public interface IVisitor
     {
         void Visit(in StringLiteral stringLiteral);
@@ -1023,24 +1188,30 @@ public readonly ref struct Literal
         Char.IsAsciiDigit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
 }
 
-public readonly ref struct StringLiteral(Input input)
+public readonly ref struct StringLiteral : IRule
 {
-    public Input Text { get; } = input;
+    public StringLiteral(Input input) => Text = input;
+    public Input Text { get; }
     public Input Value => Text[1..^1];
+    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }
 }
 
-public readonly ref struct DecimalLiteral(Input input)
+public readonly ref struct DecimalLiteral : IRule
 {
-    public Input Text { get; } = input;
+    public DecimalLiteral(Input input) => Text = input;
+    public Input Text { get; }
+    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }
 }
 
-public readonly ref struct HexLiteral(Input input)
+public readonly ref struct HexLiteral : IRule
 {
-    public Input Text { get; } = input;
+    public HexLiteral(Input input) => Text = input;
+    public Input Text { get; }
+    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }
 }
 
 // QualifiedIdentifier -> Identifier ('.' Identifier)*
-public readonly ref struct QualifiedIdentifier
+public readonly ref struct QualifiedIdentifier : IRule
 {
     private readonly Input input;
     public Int32 Length { get; }
@@ -1060,10 +1231,12 @@ public readonly ref struct QualifiedIdentifier
     }
 
     public Input Text => input[..Length];
+
+    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }
 }
 
 // Identifier -> \w [\w\d]+
-public readonly ref struct Identifier
+public readonly ref struct Identifier : IRule
 {
     private readonly Input input;
     public Int32 Length { get; }
@@ -1081,9 +1254,43 @@ public readonly ref struct Identifier
 
     public Input Text => input[..Length];
 
+    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }
+
     private static Boolean IsWordChar(Char c) =>
         Char.IsLetter(c) || c == '_';
 
     private static Boolean IsWordOrDigitChar(Char c) =>
         Char.IsLetterOrDigit(c) || c == '_';
+}
+
+// General-purpose tree printer
+public struct TreePrinter(Int32 depth = 0) : IVisitor
+{
+    public void Visit<T>(T rule) where T : IRule, allows ref struct
+    {
+        var indent = new String(' ', depth * 2);
+        var checker = new ChildChecker();
+        rule.VisitChildren(ref checker);
+
+        if (checker.HasChildren)
+        {
+            Console.WriteLine($"{indent}{typeof(T).Name}");
+            var childPrinter = new TreePrinter(depth + 1);
+            rule.VisitChildren(ref childPrinter);
+        }
+        else
+        {
+            Console.WriteLine($"{indent}{typeof(T).Name}: {rule.Text}");
+        }
+    }
+}
+
+public struct ChildChecker : IVisitor
+{
+    public Boolean HasChildren { get; private set; }
+
+    public void Visit<T>(T rule) where T : IRule, allows ref struct
+    {
+        HasChildren = true;
+    }
 }

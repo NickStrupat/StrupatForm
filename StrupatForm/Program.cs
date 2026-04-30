@@ -17,9 +17,8 @@ function main {
 """;
 
 var cu = new CompilationUnit(sample);
-Console.WriteLine($"Parsed CompilationUnit, length: {cu.Length}");
-var printer = new CompilationUnitPrinter();
-cu.Visit(printer);
+var treePrinter = new TreePrinter();
+treePrinter.Visit(cu);
 return;
 
 // var source = """
