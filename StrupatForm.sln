@@ -6,6 +6,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tests", "Tests\Tests.csproj
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Csv", "Csv\Csv.csproj", "{90989BBD-2F81-4880-837D-A8576638FD5C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Grammar", "Grammar\Grammar.csproj", "{B2BF0182-0AF1-45E6-86B4-BC1680193499}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -24,5 +26,9 @@ Global
 		{90989BBD-2F81-4880-837D-A8576638FD5C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{90989BBD-2F81-4880-837D-A8576638FD5C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{90989BBD-2F81-4880-837D-A8576638FD5C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B2BF0182-0AF1-45E6-86B4-BC1680193499}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B2BF0182-0AF1-45E6-86B4-BC1680193499}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B2BF0182-0AF1-45E6-86B4-BC1680193499}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B2BF0182-0AF1-45E6-86B4-BC1680193499}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
