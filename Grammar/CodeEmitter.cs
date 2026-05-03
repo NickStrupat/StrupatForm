@@ -13,8 +13,7 @@ public static class CodeEmitter
 
         EmitPrologue(ctx);
 
-        var sorted = TopologicalSort(grammar);
-        foreach (var rule in sorted)
+        foreach (var rule in ctx.SortedRules)
         {
             var kind = ctx.GetKind(rule);
             w.Blank();
@@ -33,6 +32,7 @@ public static class CodeEmitter
             }
         }
 
+        EmitRulesDispatchClass(ctx);
         EmitEpilogue(ctx);
         return w.ToString();
     }
@@ -47,6 +47,8 @@ public static class CodeEmitter
 
         readonly Dictionary<Rule, RuleKind> kindMap;
         readonly Dictionary<Rule, String?> firstTokenMap;
+        readonly Dictionary<Rule, Byte> ruleIdMap;
+        readonly List<Rule> sortedRules;
 
         public EmitContext(Grammar grammar, String ns, IndentedWriter w)
         {
@@ -55,10 +57,16 @@ public static class CodeEmitter
             W = w;
             kindMap = BuildKindMap(grammar);
             firstTokenMap = BuildFirstTokenMap(grammar);
+            sortedRules = TopologicalSort(grammar);
+            ruleIdMap = new Dictionary<Rule, Byte>();
+            for (var i = 0; i < sortedRules.Count; i++)
+                ruleIdMap[sortedRules[i]] = (Byte)(i + 1);
         }
 
         public RuleKind GetKind(Rule rule) => kindMap[rule];
         public String? GetFirstToken(Rule rule) => firstTokenMap.GetValueOrDefault(rule);
+        public Byte GetRuleId(Rule rule) => ruleIdMap[rule];
+        public List<Rule> SortedRules => sortedRules;
     }
 
     // --- Validation ---
@@ -188,13 +196,14 @@ public static class CodeEmitter
         w.PushIndent();
         w.Line("Input Text { get; }");
         w.Line("void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct;");
+        w.Line("void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct;");
         w.PopIndent();
         w.Line("}");
         w.Blank();
         w.Line("public interface IVisitor");
         w.Line("{");
         w.PushIndent();
-        w.Line("void Visit<T>(T rule) where T : IRule, allows ref struct;");
+        w.Line("void Visit<T>(in T rule) where T : IRule, allows ref struct;");
         w.PopIndent();
         w.Line("}");
     }
@@ -292,12 +301,14 @@ public static class CodeEmitter
         w.Line("{");
         w.PushIndent();
         w.Line("private readonly Input input;");
+        EmitParentFields(ctx);
         w.Line("public Int32 Length { get; }");
         w.Blank();
-        w.Line($"public {rule.Name}(Input input)");
+        w.Line($"public {rule.Name}({ConstructorParams()})");
         w.Line("{");
         w.PushIndent();
         w.Line("this.input = input;");
+        EmitParentAssignment(ctx);
         foreach (var group in grouped)
         {
             var len = group.Key;
@@ -317,6 +328,8 @@ public static class CodeEmitter
         w.Line("public Input Text => input[..Length];");
         w.Blank();
         w.Line("public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }");
+        w.Blank();
+        EmitVisitParent(ctx);
         w.PopIndent();
         w.Line("}");
     }
@@ -330,9 +343,12 @@ public static class CodeEmitter
         w.Line($"public readonly ref struct {rule.Name} : IRule");
         w.Line("{");
         w.PushIndent();
-        w.Line($"public {rule.Name}(Input input)");
+        EmitParentFields(ctx);
+        w.Blank();
+        w.Line($"public {rule.Name}({ConstructorParams()})");
         w.Line("{");
         w.PushIndent();
+        EmitParentAssignment(ctx);
         w.Line($"if (input.Length < {literal.Length} || input[..{literal.Length}] is not \"{EscapeString(literal)}\")");
         w.PushIndent();
         w.Line("throw new ParseException(new ParseError());");
@@ -345,6 +361,8 @@ public static class CodeEmitter
         w.Line($"public Int32 Length => {literal.Length};");
         w.Blank();
         w.Line($"public void VisitChildren<T>(ref T visitor) where T : {ns}.IVisitor, allows ref struct {{ }}");
+        w.Blank();
+        EmitVisitParent(ctx, qualifyIVisitor: true);
         w.Blank();
         w.Line("public static void Parse<T>(Input input, T visitor) where T : IVisitor");
         w.Line("{");
@@ -378,12 +396,14 @@ public static class CodeEmitter
         w.Line("{");
         w.PushIndent();
         w.Line("private readonly Input input;");
+        EmitParentFields(ctx);
         w.Line("public Int32 Length { get; }");
         w.Blank();
-        w.Line($"public {rule.Name}(Input input)");
+        w.Line($"public {rule.Name}({ConstructorParams()})");
         w.Line("{");
         w.PushIndent();
         w.Line("this.input = input;");
+        EmitParentAssignment(ctx);
 
         if (rule.Alternatives.Count == 1)
         {
@@ -400,6 +420,8 @@ public static class CodeEmitter
         w.Line("public Input Text => input[..Length];");
         w.Blank();
         w.Line("public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }");
+        w.Blank();
+        EmitVisitParent(ctx);
 
         EmitCharClassHelperMethods(rule, ctx);
 
@@ -711,16 +733,18 @@ public static class CodeEmitter
         w.Line("{");
         w.PushIndent();
         w.Line("private readonly Input input;");
+        EmitParentFields(ctx);
 
         foreach (var (_, name) in nonTerminals.Zip(propertyNames))
             w.Line($"private readonly Int32 {CamelCase(name)}Start;");
         w.Line("public Int32 Length { get; }");
 
         w.Blank();
-        w.Line($"public {rule.Name}(Input input)");
+        w.Line($"public {rule.Name}({ConstructorParams()})");
         w.Line("{");
         w.PushIndent();
         w.Line("this.input = input;");
+        EmitParentAssignment(ctx);
 
         EmitSequenceParseBody(items, nonTerminals, propertyNames, ctx);
 
@@ -734,20 +758,24 @@ public static class CodeEmitter
 
         w.Blank();
         var hasInlineRepetition = items.Any(i => i is Alternative { Quantifier.Max: null });
+        var ruleId = ctx.GetRuleId(rule);
         w.Line("public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct");
         w.Line("{");
         w.PushIndent();
         if (hasInlineRepetition)
         {
-            EmitSequenceVisitChildrenWithRepetition(items, nonTerminals, propertyNames, ctx);
+            EmitSequenceVisitChildrenWithRepetition(items, nonTerminals, propertyNames, ruleId, ctx);
         }
         else
         {
-            foreach (var (_, name) in nonTerminals.Zip(propertyNames))
-                w.Line($"visitor.Visit({name});");
+            foreach (var (rr, name) in nonTerminals.Zip(propertyNames))
+                w.Line($"visitor.Visit(new {rr.Name}(input[{CamelCase(name)}Start..], input, {ruleId}));");
         }
         w.PopIndent();
         w.Line("}");
+
+        w.Blank();
+        EmitVisitParent(ctx);
 
         if (items.Count > 1)
         {
@@ -809,7 +837,7 @@ public static class CodeEmitter
         w.Line("Length = pos;");
     }
 
-    static void EmitSequenceVisitChildrenWithRepetition(List<Item> items, List<RuleRef> nonTerminals, List<String> propertyNames, EmitContext ctx)
+    static void EmitSequenceVisitChildrenWithRepetition(List<Item> items, List<RuleRef> nonTerminals, List<String> propertyNames, Byte ruleId, EmitContext ctx)
     {
         var w = ctx.W;
         var ntIndex = 0;
@@ -819,7 +847,7 @@ public static class CodeEmitter
             if (item is RuleRef rr && rr.Quantifier is { Min: 1, Max: 1 })
             {
                 var name = propertyNames[ntIndex];
-                w.Line($"var {CamelCase(name)} = new {rr.Name}(input[{CamelCase(name)}Start..]);");
+                w.Line($"var {CamelCase(name)} = new {rr.Name}(input[{CamelCase(name)}Start..], input, {ruleId});");
                 w.Line($"visitor.Visit({CamelCase(name)});");
                 w.Line($"var pos = {CamelCase(name)}Start + {CamelCase(name)}.Length;");
                 ntIndex++;
@@ -834,7 +862,7 @@ public static class CodeEmitter
                 {
                     if (subItem is RuleRef subRr)
                     {
-                        w.Line($"var next{subRr.Name} = new {subRr.Name}(input[pos..]);");
+                        w.Line($"var next{subRr.Name} = new {subRr.Name}(input[pos..], input, {ruleId});");
                         w.Line($"visitor.Visit(next{subRr.Name});");
                         w.Line($"pos += next{subRr.Name}.Length;");
                         w.Line("pos += SkipWhitespace(input[pos..]);");
@@ -926,14 +954,16 @@ public static class CodeEmitter
         w.Line("{");
         w.PushIndent();
         w.Line("private readonly Input input;");
+        EmitParentFields(ctx);
         w.Line("private readonly Byte index;");
         w.Line("public Int32 Length { get; }");
 
         w.Blank();
-        w.Line($"public {rule.Name}(Input input)");
+        w.Line($"public {rule.Name}({ConstructorParams()})");
         w.Line("{");
         w.PushIndent();
         w.Line("this.input = input;");
+        EmitParentAssignment(ctx);
 
         EmitAlternativeConstructorBody(rule, alternatives, ctx);
 
@@ -948,6 +978,9 @@ public static class CodeEmitter
 
         w.Blank();
         EmitAlternativeVisitMethod(rule, alternatives, ctx);
+
+        w.Blank();
+        EmitVisitParent(ctx, qualifyIVisitor: true);
 
         w.Blank();
         EmitAlternativeIVisitor(rule, alternatives, ctx);
@@ -1223,6 +1256,7 @@ public static class CodeEmitter
     static void EmitAlternativeVisitChildren(Rule rule, List<(RuleRef RuleRef, Alternative Alt)> alternatives, EmitContext ctx)
     {
         var w = ctx.W;
+        var ruleId = ctx.GetRuleId(rule);
         w.Line($"public void VisitChildren<T>(ref T visitor) where T : {ctx.Namespace}.IVisitor, allows ref struct");
         w.Line("{");
         w.PushIndent();
@@ -1248,7 +1282,7 @@ public static class CodeEmitter
                 }
                 else
                 {
-                    w.Line($"visitor.Visit(new {rr.Name}(input));");
+                    w.Line($"visitor.Visit(new {rr.Name}(input, input, {ruleId}));");
                 }
                 w.PopIndent();
                 w.Line("}");
@@ -1262,7 +1296,7 @@ public static class CodeEmitter
             for (var i = 0; i < alternatives.Count; i++)
             {
                 var (rr, _) = alternatives[i];
-                w.Line($"case {i + 1}: visitor.Visit(new {rr.Name}(input)); break;");
+                w.Line($"case {i + 1}: visitor.Visit(new {rr.Name}(input, input, {ruleId})); break;");
             }
             w.PopIndent();
             w.Line("}");
@@ -1385,7 +1419,7 @@ public static class CodeEmitter
         w.Line("public struct TreePrinter(Int32 depth = 0) : IVisitor");
         w.Line("{");
         w.PushIndent();
-        w.Line("public void Visit<T>(T rule) where T : IRule, allows ref struct");
+        w.Line("public void Visit<T>(in T rule) where T : IRule, allows ref struct");
         w.Line("{");
         w.PushIndent();
         w.Line("var indent = new String(' ', depth * 2);");
@@ -1416,7 +1450,7 @@ public static class CodeEmitter
         w.PushIndent();
         w.Line("public Boolean HasChildren { get; private set; }");
         w.Blank();
-        w.Line("public void Visit<T>(T rule) where T : IRule, allows ref struct");
+        w.Line("public void Visit<T>(in T rule) where T : IRule, allows ref struct");
         w.Line("{");
         w.PushIndent();
         w.Line("HasChildren = true;");
@@ -1424,7 +1458,103 @@ public static class CodeEmitter
         w.Line("}");
         w.PopIndent();
         w.Line("}");
+        w.Blank();
+        w.Line("public struct AncestorPrinter(List<String> ancestors, Int32 depth) : IVisitor");
+        w.Line("{");
+        w.PushIndent();
+        w.Line("public AncestorPrinter() : this(new List<String>(), 0) { }");
+        w.Blank();
+        w.Line("public void Visit<T>(in T rule) where T : IRule, allows ref struct");
+        w.Line("{");
+        w.PushIndent();
+        w.Line("var name = typeof(T).Name;");
+        w.Line("ancestors.Add(name);");
+        w.Blank();
+        w.Line("var indent = new String(' ', depth * 2);");
+        w.Line("var checker = new ChildChecker();");
+        w.Line("rule.VisitChildren(ref checker);");
+        w.Blank();
+        w.Line("if (checker.HasChildren)");
+        w.Line("{");
+        w.PushIndent();
+        w.Line("Console.WriteLine($\"{indent}{name}  [{String.Join(\" > \", ancestors)}]\");");
+        w.Line("var child = new AncestorPrinter(ancestors, depth + 1);");
+        w.Line("rule.VisitChildren(ref child);");
+        w.PopIndent();
+        w.Line("}");
+        w.Line("else");
+        w.Line("{");
+        w.PushIndent();
+        w.Line("Console.WriteLine($\"{indent}{name}: {rule.Text}  [{String.Join(\" > \", ancestors)}]\");");
+        w.PopIndent();
+        w.Line("}");
+        w.Blank();
+        w.Line("ancestors.RemoveAt(ancestors.Count - 1);");
+        w.PopIndent();
+        w.Line("}");
+        w.PopIndent();
+        w.Line("}");
     }
+
+    // --- Parent tracking ---
+
+    static void EmitParentFields(EmitContext ctx)
+    {
+        var w = ctx.W;
+        w.Line("private readonly Input parentInput;");
+        w.Line("private readonly Byte parentKind;");
+    }
+
+    static void EmitParentAssignment(EmitContext ctx)
+    {
+        var w = ctx.W;
+        w.Line("this.parentInput = parentInput;");
+        w.Line("this.parentKind = parentKind;");
+    }
+
+    static void EmitVisitParent(EmitContext ctx, Boolean qualifyIVisitor = false)
+    {
+        var w = ctx.W;
+        var constraint = qualifyIVisitor ? $"{ctx.Namespace}.IVisitor" : "IVisitor";
+        w.Line($"public void VisitParent<T>(ref T visitor) where T : {constraint}, allows ref struct");
+        w.Line("{");
+        w.PushIndent();
+        w.Line($"Rules.Visit(parentKind, parentInput, ref visitor);");
+        w.PopIndent();
+        w.Line("}");
+    }
+
+    static void EmitRulesDispatchClass(EmitContext ctx)
+    {
+        var w = ctx.W;
+        w.Blank();
+        w.Line("public static class Rules");
+        w.Line("{");
+        w.PushIndent();
+        w.Line("public static void Visit<T>(Byte kind, Input input, ref T visitor) where T : IVisitor, allows ref struct");
+        w.Line("{");
+        w.PushIndent();
+        w.Line("switch (kind)");
+        w.Line("{");
+        w.PushIndent();
+        w.Line("case 0: break;");
+        foreach (var rule in ctx.SortedRules)
+        {
+            var id = ctx.GetRuleId(rule);
+            w.Line($"case {id}: visitor.Visit(new {rule.Name}(input)); break;");
+        }
+        w.PopIndent();
+        w.Line("}");
+        w.PopIndent();
+        w.Line("}");
+        w.PopIndent();
+        w.Line("}");
+    }
+
+    static String ConstructorParams() => "Input input, Input parentInput = default, Byte parentKind = 0";
+
+    static String ChildArgs(String inputExpr, EmitContext ctx, Rule parentRule) =>
+        $"{inputExpr}, input, {ctx.GetRuleId(parentRule)}";
 
     // --- Shared helpers ---
 

@@ -35,6 +35,11 @@ var cu = new CompilationUnit(sample);
 var treePrinter = new TreePrinter();
 treePrinter.Visit(cu);
 
+Console.WriteLine("\n--- Ancestor view ---");
+var cu2 = new CompilationUnit(sample);
+var ancestorPrinter = new AncestorPrinter();
+ancestorPrinter.Visit(cu2);
+
 #if TESTGEN
 Console.WriteLine("\n--- Generated parser ---");
 var simpleTest = "function main { x = x + 1; }";

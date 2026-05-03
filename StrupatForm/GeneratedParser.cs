@@ -14,22 +14,27 @@ public interface IRule
 {
     Input Text { get; }
     void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct;
+    void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct;
 }
 
 public interface IVisitor
 {
-    void Visit<T>(T rule) where T : IRule, allows ref struct;
+    void Visit<T>(in T rule) where T : IRule, allows ref struct;
 }
 
 // Identifier -> [w] [wd]
 public readonly ref struct Identifier : IRule
 {
     private readonly Input input;
+    private readonly Input parentInput;
+    private readonly Byte parentKind;
     public Int32 Length { get; }
 
-    public Identifier(Input input)
+    public Identifier(Input input, Input parentInput = default, Byte parentKind = 0)
     {
         this.input = input;
+        this.parentInput = parentInput;
+        this.parentKind = parentKind;
         var i = 0;
         if (i >= input.Length || !IsWordChar(input[i]))
             throw new ParseException(new ParseError());
@@ -43,6 +48,11 @@ public readonly ref struct Identifier : IRule
 
     public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }
 
+    public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
+    {
+        Rules.Visit(parentKind, parentInput, ref visitor);
+    }
+
     private static Boolean IsWordChar(Char c) =>
         (Char.IsLetter(c) || c == '_');
 
@@ -54,12 +64,16 @@ public readonly ref struct Identifier : IRule
 public readonly ref struct QualifiedIdentifier : IRule
 {
     private readonly Input input;
+    private readonly Input parentInput;
+    private readonly Byte parentKind;
     private readonly Int32 identifierStart;
     public Int32 Length { get; }
 
-    public QualifiedIdentifier(Input input)
+    public QualifiedIdentifier(Input input, Input parentInput = default, Byte parentKind = 0)
     {
         this.input = input;
+        this.parentInput = parentInput;
+        this.parentKind = parentKind;
         var pos = 0;
         identifierStart = pos;
         var identifier = new Identifier(input[pos..]);
@@ -79,17 +93,22 @@ public readonly ref struct QualifiedIdentifier : IRule
 
     public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
     {
-        var identifier = new Identifier(input[identifierStart..]);
+        var identifier = new Identifier(input[identifierStart..], input, 2);
         visitor.Visit(identifier);
         var pos = identifierStart + identifier.Length;
         while (pos < Length)
         {
             pos += SkipWhitespace(input[pos..]);
-            var nextIdentifier = new Identifier(input[pos..]);
+            var nextIdentifier = new Identifier(input[pos..], input, 2);
             visitor.Visit(nextIdentifier);
             pos += nextIdentifier.Length;
             pos += SkipWhitespace(input[pos..]);
         }
+    }
+
+    public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
+    {
+        Rules.Visit(parentKind, parentInput, ref visitor);
     }
 
     private static Int32 SkipWhitespace(Input input)
@@ -108,11 +127,15 @@ public readonly ref struct QualifiedIdentifier : IRule
 public readonly ref struct Literal : IRule
 {
     private readonly Input input;
+    private readonly Input parentInput;
+    private readonly Byte parentKind;
     public Int32 Length { get; }
 
-    public Literal(Input input)
+    public Literal(Input input, Input parentInput = default, Byte parentKind = 0)
     {
         this.input = input;
+        this.parentInput = parentInput;
+        this.parentKind = parentKind;
         if (input.Length > 0 && input[0] == '\"')
         {
             var end = input[1..].IndexOf('\"');
@@ -152,6 +175,11 @@ public readonly ref struct Literal : IRule
 
     public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }
 
+    public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
+    {
+        Rules.Visit(parentKind, parentInput, ref visitor);
+    }
+
     private static Boolean IsNot22Char(Char c) =>
         !(c == '\"');
 
@@ -171,12 +199,16 @@ public readonly ref struct Literal : IRule
 public readonly ref struct PrimaryExpression : IRule
 {
     private readonly Input input;
+    private readonly Input parentInput;
+    private readonly Byte parentKind;
     private readonly Byte index;
     public Int32 Length { get; }
 
-    public PrimaryExpression(Input input)
+    public PrimaryExpression(Input input, Input parentInput = default, Byte parentKind = 0)
     {
         this.input = input;
+        this.parentInput = parentInput;
+        this.parentKind = parentKind;
         try
         {
             var literal = new Literal(input);
@@ -197,8 +229,8 @@ public readonly ref struct PrimaryExpression : IRule
     {
         switch (index)
         {
-            case 1: visitor.Visit(new Identifier(input)); break;
-            case 2: visitor.Visit(new Literal(input)); break;
+            case 1: visitor.Visit(new Identifier(input, input, 4)); break;
+            case 2: visitor.Visit(new Literal(input, input, 4)); break;
         }
     }
 
@@ -214,6 +246,11 @@ public readonly ref struct PrimaryExpression : IRule
         }
     }
 
+    public void VisitParent<T>(ref T visitor) where T : GeneratedParser.IVisitor, allows ref struct
+    {
+        Rules.Visit(parentKind, parentInput, ref visitor);
+    }
+
     public interface IVisitor
     {
         void Visit(in ParseError parseError);
@@ -225,8 +262,13 @@ public readonly ref struct PrimaryExpression : IRule
 // UnaryOperator -> "!"
 public readonly ref struct UnaryOperator : IRule
 {
-    public UnaryOperator(Input input)
+    private readonly Input parentInput;
+    private readonly Byte parentKind;
+
+    public UnaryOperator(Input input, Input parentInput = default, Byte parentKind = 0)
     {
+        this.parentInput = parentInput;
+        this.parentKind = parentKind;
         if (input.Length < 1 || input[..1] is not "!")
             throw new ParseException(new ParseError());
         Text = input[..1];
@@ -236,6 +278,11 @@ public readonly ref struct UnaryOperator : IRule
     public Int32 Length => 1;
 
     public void VisitChildren<T>(ref T visitor) where T : GeneratedParser.IVisitor, allows ref struct { }
+
+    public void VisitParent<T>(ref T visitor) where T : GeneratedParser.IVisitor, allows ref struct
+    {
+        Rules.Visit(parentKind, parentInput, ref visitor);
+    }
 
     public static void Parse<T>(Input input, T visitor) where T : IVisitor
     {
@@ -257,13 +304,17 @@ public readonly ref struct UnaryOperator : IRule
 public readonly ref struct UnaryExpression : IRule
 {
     private readonly Input input;
+    private readonly Input parentInput;
+    private readonly Byte parentKind;
     private readonly Int32 unaryOperatorStart;
     private readonly Int32 expressionStart;
     public Int32 Length { get; }
 
-    public UnaryExpression(Input input)
+    public UnaryExpression(Input input, Input parentInput = default, Byte parentKind = 0)
     {
         this.input = input;
+        this.parentInput = parentInput;
+        this.parentKind = parentKind;
         var pos = 0;
         unaryOperatorStart = pos;
         var unaryOperator = new UnaryOperator(input[pos..]);
@@ -281,8 +332,13 @@ public readonly ref struct UnaryExpression : IRule
 
     public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
     {
-        visitor.Visit(UnaryOperator);
-        visitor.Visit(Expression);
+        visitor.Visit(new UnaryOperator(input[unaryOperatorStart..], input, 6));
+        visitor.Visit(new Expression(input[expressionStart..], input, 6));
+    }
+
+    public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
+    {
+        Rules.Visit(parentKind, parentInput, ref visitor);
     }
 
     private static Int32 SkipWhitespace(Input input)
@@ -300,12 +356,16 @@ public readonly ref struct UnaryExpression : IRule
 public readonly ref struct Atom : IRule
 {
     private readonly Input input;
+    private readonly Input parentInput;
+    private readonly Byte parentKind;
     private readonly Byte index;
     public Int32 Length { get; }
 
-    public Atom(Input input)
+    public Atom(Input input, Input parentInput = default, Byte parentKind = 0)
     {
         this.input = input;
+        this.parentInput = parentInput;
+        this.parentKind = parentKind;
         try
         {
             var unaryExpression = new UnaryExpression(input);
@@ -326,8 +386,8 @@ public readonly ref struct Atom : IRule
     {
         switch (index)
         {
-            case 1: visitor.Visit(new PrimaryExpression(input)); break;
-            case 2: visitor.Visit(new UnaryExpression(input)); break;
+            case 1: visitor.Visit(new PrimaryExpression(input, input, 7)); break;
+            case 2: visitor.Visit(new UnaryExpression(input, input, 7)); break;
         }
     }
 
@@ -343,6 +403,11 @@ public readonly ref struct Atom : IRule
         }
     }
 
+    public void VisitParent<T>(ref T visitor) where T : GeneratedParser.IVisitor, allows ref struct
+    {
+        Rules.Visit(parentKind, parentInput, ref visitor);
+    }
+
     public interface IVisitor
     {
         void Visit(in ParseError parseError);
@@ -355,12 +420,16 @@ public readonly ref struct Atom : IRule
 public readonly ref struct Expression : IRule
 {
     private readonly Input input;
+    private readonly Input parentInput;
+    private readonly Byte parentKind;
     private readonly Int32 atomStart;
     public Int32 Length { get; }
 
-    public Expression(Input input)
+    public Expression(Input input, Input parentInput = default, Byte parentKind = 0)
     {
         this.input = input;
+        this.parentInput = parentInput;
+        this.parentKind = parentKind;
         var pos = 0;
         atomStart = pos;
         var atom = new Atom(input[pos..]);
@@ -393,21 +462,26 @@ public readonly ref struct Expression : IRule
 
     public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
     {
-        var atom = new Atom(input[atomStart..]);
+        var atom = new Atom(input[atomStart..], input, 8);
         visitor.Visit(atom);
         var pos = atomStart + atom.Length;
         while (pos < Length)
         {
             pos += SkipWhitespace(input[pos..]);
-            var nextBinaryOperator = new BinaryOperator(input[pos..]);
+            var nextBinaryOperator = new BinaryOperator(input[pos..], input, 8);
             visitor.Visit(nextBinaryOperator);
             pos += nextBinaryOperator.Length;
             pos += SkipWhitespace(input[pos..]);
-            var nextAtom = new Atom(input[pos..]);
+            var nextAtom = new Atom(input[pos..], input, 8);
             visitor.Visit(nextAtom);
             pos += nextAtom.Length;
             pos += SkipWhitespace(input[pos..]);
         }
+    }
+
+    public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
+    {
+        Rules.Visit(parentKind, parentInput, ref visitor);
     }
 
     private static Int32 SkipWhitespace(Input input)
@@ -423,12 +497,16 @@ public readonly ref struct Expression : IRule
 public readonly ref struct ExpressionStatement : IRule
 {
     private readonly Input input;
+    private readonly Input parentInput;
+    private readonly Byte parentKind;
     private readonly Int32 expressionStart;
     public Int32 Length { get; }
 
-    public ExpressionStatement(Input input)
+    public ExpressionStatement(Input input, Input parentInput = default, Byte parentKind = 0)
     {
         this.input = input;
+        this.parentInput = parentInput;
+        this.parentKind = parentKind;
         var pos = 0;
         expressionStart = pos;
         var expression = new Expression(input[pos..]);
@@ -441,7 +519,12 @@ public readonly ref struct ExpressionStatement : IRule
 
     public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
     {
-        visitor.Visit(Expression);
+        visitor.Visit(new Expression(input[expressionStart..], input, 9));
+    }
+
+    public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
+    {
+        Rules.Visit(parentKind, parentInput, ref visitor);
     }
 }
 
@@ -449,13 +532,17 @@ public readonly ref struct ExpressionStatement : IRule
 public readonly ref struct VariableDeclarationStatement : IRule
 {
     private readonly Input input;
+    private readonly Input parentInput;
+    private readonly Byte parentKind;
     private readonly Int32 identifierStart;
     private readonly Int32 expressionStart;
     public Int32 Length { get; }
 
-    public VariableDeclarationStatement(Input input)
+    public VariableDeclarationStatement(Input input, Input parentInput = default, Byte parentKind = 0)
     {
         this.input = input;
+        this.parentInput = parentInput;
+        this.parentKind = parentKind;
         var pos = 0;
         if (!input[pos..].StartsWith("var"))
             throw new ParseException(new ParseError());
@@ -481,8 +568,13 @@ public readonly ref struct VariableDeclarationStatement : IRule
 
     public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
     {
-        visitor.Visit(Identifier);
-        visitor.Visit(Expression);
+        visitor.Visit(new Identifier(input[identifierStart..], input, 10));
+        visitor.Visit(new Expression(input[expressionStart..], input, 10));
+    }
+
+    public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
+    {
+        Rules.Visit(parentKind, parentInput, ref visitor);
     }
 
     private static Int32 SkipWhitespace(Input input)
@@ -498,13 +590,17 @@ public readonly ref struct VariableDeclarationStatement : IRule
 public readonly ref struct AssignmentStatement : IRule
 {
     private readonly Input input;
+    private readonly Input parentInput;
+    private readonly Byte parentKind;
     private readonly Int32 identifierStart;
     private readonly Int32 expressionStart;
     public Int32 Length { get; }
 
-    public AssignmentStatement(Input input)
+    public AssignmentStatement(Input input, Input parentInput = default, Byte parentKind = 0)
     {
         this.input = input;
+        this.parentInput = parentInput;
+        this.parentKind = parentKind;
         var pos = 0;
         identifierStart = pos;
         var identifier = new Identifier(input[pos..]);
@@ -526,8 +622,13 @@ public readonly ref struct AssignmentStatement : IRule
 
     public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
     {
-        visitor.Visit(Identifier);
-        visitor.Visit(Expression);
+        visitor.Visit(new Identifier(input[identifierStart..], input, 11));
+        visitor.Visit(new Expression(input[expressionStart..], input, 11));
+    }
+
+    public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
+    {
+        Rules.Visit(parentKind, parentInput, ref visitor);
     }
 
     private static Int32 SkipWhitespace(Input input)
@@ -543,12 +644,16 @@ public readonly ref struct AssignmentStatement : IRule
 public readonly ref struct ReturnStatement : IRule
 {
     private readonly Input input;
+    private readonly Input parentInput;
+    private readonly Byte parentKind;
     private readonly Int32 expressionStart;
     public Int32 Length { get; }
 
-    public ReturnStatement(Input input)
+    public ReturnStatement(Input input, Input parentInput = default, Byte parentKind = 0)
     {
         this.input = input;
+        this.parentInput = parentInput;
+        this.parentKind = parentKind;
         var pos = 0;
         if (!input[pos..].StartsWith("return"))
             throw new ParseException(new ParseError());
@@ -565,7 +670,12 @@ public readonly ref struct ReturnStatement : IRule
 
     public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
     {
-        visitor.Visit(Expression);
+        visitor.Visit(new Expression(input[expressionStart..], input, 12));
+    }
+
+    public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
+    {
+        Rules.Visit(parentKind, parentInput, ref visitor);
     }
 
     private static Int32 SkipWhitespace(Input input)
@@ -585,12 +695,16 @@ public readonly ref struct ReturnStatement : IRule
 public readonly ref struct Statement : IRule
 {
     private readonly Input input;
+    private readonly Input parentInput;
+    private readonly Byte parentKind;
     private readonly Byte index;
     public Int32 Length { get; }
 
-    public Statement(Input input)
+    public Statement(Input input, Input parentInput = default, Byte parentKind = 0)
     {
         this.input = input;
+        this.parentInput = parentInput;
+        this.parentKind = parentKind;
         if (input.StartsWith("var"))
         {
             var variableDeclarationStatement = new VariableDeclarationStatement(input);
@@ -626,10 +740,10 @@ public readonly ref struct Statement : IRule
     {
         switch (index)
         {
-            case 1: visitor.Visit(new ExpressionStatement(input)); break;
-            case 2: visitor.Visit(new VariableDeclarationStatement(input)); break;
-            case 3: visitor.Visit(new AssignmentStatement(input)); break;
-            case 4: visitor.Visit(new ReturnStatement(input)); break;
+            case 1: visitor.Visit(new ExpressionStatement(input, input, 13)); break;
+            case 2: visitor.Visit(new VariableDeclarationStatement(input, input, 13)); break;
+            case 3: visitor.Visit(new AssignmentStatement(input, input, 13)); break;
+            case 4: visitor.Visit(new ReturnStatement(input, input, 13)); break;
         }
     }
 
@@ -647,6 +761,11 @@ public readonly ref struct Statement : IRule
         }
     }
 
+    public void VisitParent<T>(ref T visitor) where T : GeneratedParser.IVisitor, allows ref struct
+    {
+        Rules.Visit(parentKind, parentInput, ref visitor);
+    }
+
     public interface IVisitor
     {
         void Visit(in ParseError parseError);
@@ -661,12 +780,16 @@ public readonly ref struct Statement : IRule
 public readonly ref struct BodyElement : IRule
 {
     private readonly Input input;
+    private readonly Input parentInput;
+    private readonly Byte parentKind;
     private readonly Int32 statementStart;
     public Int32 Length { get; }
 
-    public BodyElement(Input input)
+    public BodyElement(Input input, Input parentInput = default, Byte parentKind = 0)
     {
         this.input = input;
+        this.parentInput = parentInput;
+        this.parentKind = parentKind;
         var pos = 0;
         statementStart = pos;
         var statement = new Statement(input[pos..]);
@@ -683,7 +806,12 @@ public readonly ref struct BodyElement : IRule
 
     public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
     {
-        visitor.Visit(Statement);
+        visitor.Visit(new Statement(input[statementStart..], input, 14));
+    }
+
+    public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
+    {
+        Rules.Visit(parentKind, parentInput, ref visitor);
     }
 
     private static Int32 SkipWhitespace(Input input)
@@ -701,12 +829,16 @@ public readonly ref struct BodyElement : IRule
 public readonly ref struct FunctionBody : IRule
 {
     private readonly Input input;
+    private readonly Input parentInput;
+    private readonly Byte parentKind;
     private readonly Byte index;
     public Int32 Length { get; }
 
-    public FunctionBody(Input input)
+    public FunctionBody(Input input, Input parentInput = default, Byte parentKind = 0)
     {
         this.input = input;
+        this.parentInput = parentInput;
+        this.parentKind = parentKind;
         try
         {
             var first = new BodyElement(input);
@@ -742,7 +874,7 @@ public readonly ref struct FunctionBody : IRule
     {
         if (index == 1)
         {
-            visitor.Visit(new Statement(input));
+            visitor.Visit(new Statement(input, input, 15));
         }
         else if (index == 2)
         {
@@ -761,6 +893,11 @@ public readonly ref struct FunctionBody : IRule
             case Byte.MaxValue: visitor.Visit(new ParseError()); break;
             default: throw new ArgumentOutOfRangeException(nameof(index));
         }
+    }
+
+    public void VisitParent<T>(ref T visitor) where T : GeneratedParser.IVisitor, allows ref struct
+    {
+        Rules.Visit(parentKind, parentInput, ref visitor);
     }
 
     public interface IVisitor
@@ -830,13 +967,17 @@ public readonly ref struct BodyElementEnumerable
 public readonly ref struct FunctionDeclaration : IRule
 {
     private readonly Input input;
+    private readonly Input parentInput;
+    private readonly Byte parentKind;
     private readonly Int32 identifierStart;
     private readonly Int32 functionBodyStart;
     public Int32 Length { get; }
 
-    public FunctionDeclaration(Input input)
+    public FunctionDeclaration(Input input, Input parentInput = default, Byte parentKind = 0)
     {
         this.input = input;
+        this.parentInput = parentInput;
+        this.parentKind = parentKind;
         var pos = 0;
         if (!input[pos..].StartsWith("function"))
             throw new ParseException(new ParseError());
@@ -866,8 +1007,13 @@ public readonly ref struct FunctionDeclaration : IRule
 
     public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
     {
-        visitor.Visit(Identifier);
-        visitor.Visit(FunctionBody);
+        visitor.Visit(new Identifier(input[identifierStart..], input, 16));
+        visitor.Visit(new FunctionBody(input[functionBodyStart..], input, 16));
+    }
+
+    public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
+    {
+        Rules.Visit(parentKind, parentInput, ref visitor);
     }
 
     private static Int32 SkipWhitespace(Input input)
@@ -885,12 +1031,16 @@ public readonly ref struct FunctionDeclaration : IRule
 public readonly ref struct TypeBody : IRule
 {
     private readonly Input input;
+    private readonly Input parentInput;
+    private readonly Byte parentKind;
     private readonly Byte index;
     public Int32 Length { get; }
 
-    public TypeBody(Input input)
+    public TypeBody(Input input, Input parentInput = default, Byte parentKind = 0)
     {
         this.input = input;
+        this.parentInput = parentInput;
+        this.parentKind = parentKind;
         if (input.StartsWith("type"))
         {
             var typeDeclaration = new TypeDeclaration(input);
@@ -916,8 +1066,8 @@ public readonly ref struct TypeBody : IRule
     {
         switch (index)
         {
-            case 1: visitor.Visit(new TypeDeclaration(input)); break;
-            case 2: visitor.Visit(new FunctionDeclaration(input)); break;
+            case 1: visitor.Visit(new TypeDeclaration(input, input, 17)); break;
+            case 2: visitor.Visit(new FunctionDeclaration(input, input, 17)); break;
         }
     }
 
@@ -933,6 +1083,11 @@ public readonly ref struct TypeBody : IRule
         }
     }
 
+    public void VisitParent<T>(ref T visitor) where T : GeneratedParser.IVisitor, allows ref struct
+    {
+        Rules.Visit(parentKind, parentInput, ref visitor);
+    }
+
     public interface IVisitor
     {
         void Visit(in ParseError parseError);
@@ -945,13 +1100,17 @@ public readonly ref struct TypeBody : IRule
 public readonly ref struct TypeDeclaration : IRule
 {
     private readonly Input input;
+    private readonly Input parentInput;
+    private readonly Byte parentKind;
     private readonly Int32 identifierStart;
     private readonly Int32 typeBodyStart;
     public Int32 Length { get; }
 
-    public TypeDeclaration(Input input)
+    public TypeDeclaration(Input input, Input parentInput = default, Byte parentKind = 0)
     {
         this.input = input;
+        this.parentInput = parentInput;
+        this.parentKind = parentKind;
         var pos = 0;
         if (!input[pos..].StartsWith("type"))
             throw new ParseException(new ParseError());
@@ -981,8 +1140,13 @@ public readonly ref struct TypeDeclaration : IRule
 
     public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
     {
-        visitor.Visit(Identifier);
-        visitor.Visit(TypeBody);
+        visitor.Visit(new Identifier(input[identifierStart..], input, 18));
+        visitor.Visit(new TypeBody(input[typeBodyStart..], input, 18));
+    }
+
+    public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
+    {
+        Rules.Visit(parentKind, parentInput, ref visitor);
     }
 
     private static Int32 SkipWhitespace(Input input)
@@ -1001,12 +1165,16 @@ public readonly ref struct TypeDeclaration : IRule
 public readonly ref struct NamespaceBody : IRule
 {
     private readonly Input input;
+    private readonly Input parentInput;
+    private readonly Byte parentKind;
     private readonly Byte index;
     public Int32 Length { get; }
 
-    public NamespaceBody(Input input)
+    public NamespaceBody(Input input, Input parentInput = default, Byte parentKind = 0)
     {
         this.input = input;
+        this.parentInput = parentInput;
+        this.parentKind = parentKind;
         if (input.StartsWith("namespace"))
         {
             var namespaceDeclaration = new NamespaceDeclaration(input);
@@ -1038,9 +1206,9 @@ public readonly ref struct NamespaceBody : IRule
     {
         switch (index)
         {
-            case 1: visitor.Visit(new NamespaceDeclaration(input)); break;
-            case 2: visitor.Visit(new TypeDeclaration(input)); break;
-            case 3: visitor.Visit(new FunctionDeclaration(input)); break;
+            case 1: visitor.Visit(new NamespaceDeclaration(input, input, 19)); break;
+            case 2: visitor.Visit(new TypeDeclaration(input, input, 19)); break;
+            case 3: visitor.Visit(new FunctionDeclaration(input, input, 19)); break;
         }
     }
 
@@ -1057,6 +1225,11 @@ public readonly ref struct NamespaceBody : IRule
         }
     }
 
+    public void VisitParent<T>(ref T visitor) where T : GeneratedParser.IVisitor, allows ref struct
+    {
+        Rules.Visit(parentKind, parentInput, ref visitor);
+    }
+
     public interface IVisitor
     {
         void Visit(in ParseError parseError);
@@ -1070,13 +1243,17 @@ public readonly ref struct NamespaceBody : IRule
 public readonly ref struct NamespaceDeclaration : IRule
 {
     private readonly Input input;
+    private readonly Input parentInput;
+    private readonly Byte parentKind;
     private readonly Int32 qualifiedIdentifierStart;
     private readonly Int32 namespaceBodyStart;
     public Int32 Length { get; }
 
-    public NamespaceDeclaration(Input input)
+    public NamespaceDeclaration(Input input, Input parentInput = default, Byte parentKind = 0)
     {
         this.input = input;
+        this.parentInput = parentInput;
+        this.parentKind = parentKind;
         var pos = 0;
         if (!input[pos..].StartsWith("namespace"))
             throw new ParseException(new ParseError());
@@ -1106,8 +1283,13 @@ public readonly ref struct NamespaceDeclaration : IRule
 
     public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
     {
-        visitor.Visit(QualifiedIdentifier);
-        visitor.Visit(NamespaceBody);
+        visitor.Visit(new QualifiedIdentifier(input[qualifiedIdentifierStart..], input, 20));
+        visitor.Visit(new NamespaceBody(input[namespaceBodyStart..], input, 20));
+    }
+
+    public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
+    {
+        Rules.Visit(parentKind, parentInput, ref visitor);
     }
 
     private static Int32 SkipWhitespace(Input input)
@@ -1126,12 +1308,16 @@ public readonly ref struct NamespaceDeclaration : IRule
 public readonly ref struct CompilationUnit : IRule
 {
     private readonly Input input;
+    private readonly Input parentInput;
+    private readonly Byte parentKind;
     private readonly Byte index;
     public Int32 Length { get; }
 
-    public CompilationUnit(Input input)
+    public CompilationUnit(Input input, Input parentInput = default, Byte parentKind = 0)
     {
         this.input = input;
+        this.parentInput = parentInput;
+        this.parentKind = parentKind;
         if (input.StartsWith("namespace"))
         {
             var namespaceDeclaration = new NamespaceDeclaration(input);
@@ -1163,9 +1349,9 @@ public readonly ref struct CompilationUnit : IRule
     {
         switch (index)
         {
-            case 1: visitor.Visit(new NamespaceDeclaration(input)); break;
-            case 2: visitor.Visit(new TypeDeclaration(input)); break;
-            case 3: visitor.Visit(new FunctionDeclaration(input)); break;
+            case 1: visitor.Visit(new NamespaceDeclaration(input, input, 21)); break;
+            case 2: visitor.Visit(new TypeDeclaration(input, input, 21)); break;
+            case 3: visitor.Visit(new FunctionDeclaration(input, input, 21)); break;
         }
     }
 
@@ -1180,6 +1366,11 @@ public readonly ref struct CompilationUnit : IRule
             case Byte.MaxValue: visitor.Visit(new ParseError()); break;
             default: throw new ArgumentOutOfRangeException(nameof(index));
         }
+    }
+
+    public void VisitParent<T>(ref T visitor) where T : GeneratedParser.IVisitor, allows ref struct
+    {
+        Rules.Visit(parentKind, parentInput, ref visitor);
     }
 
     public interface IVisitor
@@ -1208,11 +1399,15 @@ public readonly ref struct CompilationUnit : IRule
 public readonly ref struct BinaryOperator : IRule
 {
     private readonly Input input;
+    private readonly Input parentInput;
+    private readonly Byte parentKind;
     public Int32 Length { get; }
 
-    public BinaryOperator(Input input)
+    public BinaryOperator(Input input, Input parentInput = default, Byte parentKind = 0)
     {
         this.input = input;
+        this.parentInput = parentInput;
+        this.parentKind = parentKind;
         if (input.Length >= 2 && input[..2] is "&&" or "||" or "==" or "!=" or "<=" or ">=")
         {
             Length = 2;
@@ -1229,12 +1424,50 @@ public readonly ref struct BinaryOperator : IRule
     public Input Text => input[..Length];
 
     public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }
+
+    public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
+    {
+        Rules.Visit(parentKind, parentInput, ref visitor);
+    }
+}
+
+public static class Rules
+{
+    public static void Visit<T>(Byte kind, Input input, ref T visitor) where T : IVisitor, allows ref struct
+    {
+        switch (kind)
+        {
+            case 0: break;
+            case 1: visitor.Visit(new Identifier(input)); break;
+            case 2: visitor.Visit(new QualifiedIdentifier(input)); break;
+            case 3: visitor.Visit(new Literal(input)); break;
+            case 4: visitor.Visit(new PrimaryExpression(input)); break;
+            case 5: visitor.Visit(new UnaryOperator(input)); break;
+            case 6: visitor.Visit(new UnaryExpression(input)); break;
+            case 7: visitor.Visit(new Atom(input)); break;
+            case 8: visitor.Visit(new Expression(input)); break;
+            case 9: visitor.Visit(new ExpressionStatement(input)); break;
+            case 10: visitor.Visit(new VariableDeclarationStatement(input)); break;
+            case 11: visitor.Visit(new AssignmentStatement(input)); break;
+            case 12: visitor.Visit(new ReturnStatement(input)); break;
+            case 13: visitor.Visit(new Statement(input)); break;
+            case 14: visitor.Visit(new BodyElement(input)); break;
+            case 15: visitor.Visit(new FunctionBody(input)); break;
+            case 16: visitor.Visit(new FunctionDeclaration(input)); break;
+            case 17: visitor.Visit(new TypeBody(input)); break;
+            case 18: visitor.Visit(new TypeDeclaration(input)); break;
+            case 19: visitor.Visit(new NamespaceBody(input)); break;
+            case 20: visitor.Visit(new NamespaceDeclaration(input)); break;
+            case 21: visitor.Visit(new CompilationUnit(input)); break;
+            case 22: visitor.Visit(new BinaryOperator(input)); break;
+        }
+    }
 }
 
 // General-purpose tree printer
 public struct TreePrinter(Int32 depth = 0) : IVisitor
 {
-    public void Visit<T>(T rule) where T : IRule, allows ref struct
+    public void Visit<T>(in T rule) where T : IRule, allows ref struct
     {
         var indent = new String(' ', depth * 2);
         var checker = new ChildChecker();
@@ -1257,8 +1490,36 @@ public struct ChildChecker : IVisitor
 {
     public Boolean HasChildren { get; private set; }
 
-    public void Visit<T>(T rule) where T : IRule, allows ref struct
+    public void Visit<T>(in T rule) where T : IRule, allows ref struct
     {
         HasChildren = true;
+    }
+}
+
+public struct AncestorPrinter(List<String> ancestors, Int32 depth) : IVisitor
+{
+    public AncestorPrinter() : this(new List<String>(), 0) { }
+
+    public void Visit<T>(in T rule) where T : IRule, allows ref struct
+    {
+        var name = typeof(T).Name;
+        ancestors.Add(name);
+
+        var indent = new String(' ', depth * 2);
+        var checker = new ChildChecker();
+        rule.VisitChildren(ref checker);
+
+        if (checker.HasChildren)
+        {
+            Console.WriteLine($"{indent}{name}  [{String.Join(" > ", ancestors)}]");
+            var child = new AncestorPrinter(ancestors, depth + 1);
+            rule.VisitChildren(ref child);
+        }
+        else
+        {
+            Console.WriteLine($"{indent}{name}: {rule.Text}  [{String.Join(" > ", ancestors)}]");
+        }
+
+        ancestors.RemoveAt(ancestors.Count - 1);
     }
 }

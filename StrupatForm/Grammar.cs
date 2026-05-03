@@ -14,11 +14,12 @@ public interface IRule
 {
     Input Text { get; }
     void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct;
+    void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct;
 }
 
 public interface IVisitor
 {
-    void Visit<T>(T rule) where T : IRule, allows ref struct;
+    void Visit<T>(in T rule) where T : IRule, allows ref struct;
 }
 
 // Grammar -> CompilationUnit
@@ -88,6 +89,9 @@ public readonly ref struct CompilationUnit : IRule
         }
     }
 
+
+    public void VisitParent<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct { }
+
     public void Visit<T>(T visitor) where T : IVisitor
     {
         switch (index)
@@ -154,6 +158,9 @@ public readonly ref struct NamespaceDeclaration : IRule
         visitor.Visit(Body);
     }
 
+
+    public void VisitParent<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct { }
+
     private static Int32 SkipWhitespace(Input input)
     {
         var i = 0;
@@ -212,6 +219,9 @@ public readonly ref struct NamespaceBody : IRule
             case 3: visitor.Visit(new FunctionDeclaration(input)); break;
         }
     }
+
+
+    public void VisitParent<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct { }
 
     public void Visit<T>(T visitor) where T : IVisitor
     {
@@ -279,6 +289,9 @@ public readonly ref struct TypeDeclaration : IRule
         visitor.Visit(Body);
     }
 
+
+    public void VisitParent<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct { }
+
     private static Int32 SkipWhitespace(Input input)
     {
         var i = 0;
@@ -329,6 +342,9 @@ public readonly ref struct TypeBody : IRule
             case 2: visitor.Visit(new FunctionDeclaration(input)); break;
         }
     }
+
+
+    public void VisitParent<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct { }
 
     public void Visit<T>(T visitor) where T : IVisitor
     {
@@ -393,6 +409,9 @@ public readonly ref struct FunctionDeclaration : IRule
         visitor.Visit(Name);
         visitor.Visit(Body);
     }
+
+
+    public void VisitParent<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct { }
 
     private static Int32 SkipWhitespace(Input input)
     {
@@ -460,6 +479,9 @@ public readonly ref struct FunctionBody : IRule
         }
     }
 
+
+    public void VisitParent<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct { }
+
     public void Visit<T>(T visitor) where T : IVisitor
     {
         switch (index)
@@ -513,6 +535,9 @@ public readonly ref struct BodyElement : IRule
     {
         visitor.Visit(Statement);
     }
+
+
+    public void VisitParent<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct { }
 
     private static Int32 SkipWhitespace(Input input)
     {
@@ -626,6 +651,9 @@ public readonly ref struct Statement : IRule
         }
     }
 
+
+    public void VisitParent<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct { }
+
     public void Visit<T>(T visitor) where T : IVisitor
     {
         switch (index)
@@ -670,6 +698,9 @@ public readonly ref struct ExpressionStatement : IRule
     {
         visitor.Visit(Expression);
     }
+
+
+    public void VisitParent<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct { }
 }
 
 // VariableDeclarationStatement -> "var" Identifier "=" Expression
@@ -711,6 +742,9 @@ public readonly ref struct VariableDeclarationStatement : IRule
         visitor.Visit(Name);
         visitor.Visit(Value);
     }
+
+
+    public void VisitParent<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct { }
 
     private static Int32 SkipWhitespace(Input input)
     {
@@ -755,6 +789,9 @@ public readonly ref struct AssignmentStatement : IRule
         visitor.Visit(Value);
     }
 
+
+    public void VisitParent<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct { }
+
     private static Int32 SkipWhitespace(Input input)
     {
         var i = 0;
@@ -792,6 +829,9 @@ public readonly ref struct ReturnStatement : IRule
     {
         visitor.Visit(Expression);
     }
+
+
+    public void VisitParent<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct { }
 
     private static Int32 SkipWhitespace(Input input)
     {
@@ -858,6 +898,9 @@ public readonly ref struct Expression : IRule
         }
     }
 
+
+    public void VisitParent<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct { }
+
     private static Int32 SkipWhitespace(Input input)
     {
         var i = 0;
@@ -903,6 +946,9 @@ public readonly ref struct Atom : IRule
             case 2: visitor.Visit(new UnaryExpression(input)); break;
         }
     }
+
+
+    public void VisitParent<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct { }
 
     public void Visit<T>(T visitor) where T : IVisitor
     {
@@ -961,6 +1007,9 @@ public readonly ref struct PrimaryExpression : IRule
         }
     }
 
+
+    public void VisitParent<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct { }
+
     public void Visit<T>(T visitor) where T : IVisitor
     {
         switch (index)
@@ -1012,6 +1061,9 @@ public readonly ref struct UnaryExpression : IRule
         visitor.Visit(Operand);
     }
 
+
+    public void VisitParent<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct { }
+
     private static Int32 SkipWhitespace(Input input)
     {
         var i = 0;
@@ -1029,6 +1081,7 @@ public readonly ref struct UnaryOperator : IRule
     public Input Text { get; }
 
     public void VisitChildren<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct { }
+    public void VisitParent<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct { }
 
     public static void Parse<T>(Input input, T visitor) where T : IVisitor
     {
@@ -1071,6 +1124,7 @@ public readonly ref struct BinaryOperator : IRule
     public Input Text => input[..Length];
 
     public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }
+    public void VisitParent<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct { }
 }
 
 // Literal
@@ -1117,6 +1171,7 @@ public readonly ref struct Literal : IRule
     public Input Text => input[..Length];
 
     public void VisitChildren<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct { }
+    public void VisitParent<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct { }
 
     private static Boolean IsHexDigit(Char c) =>
         Char.IsAsciiDigit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
@@ -1145,6 +1200,7 @@ public readonly ref struct QualifiedIdentifier : IRule
     public Input Text => input[..Length];
 
     public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }
+    public void VisitParent<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct { }
 }
 
 // Identifier -> \w [\w\d]+
@@ -1167,6 +1223,7 @@ public readonly ref struct Identifier : IRule
     public Input Text => input[..Length];
 
     public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }
+    public void VisitParent<T>(ref T visitor) where T : ExampleOfGeneratedParser.IVisitor, allows ref struct { }
 
     private static Boolean IsWordChar(Char c) =>
         Char.IsLetter(c) || c == '_';
@@ -1178,7 +1235,7 @@ public readonly ref struct Identifier : IRule
 // General-purpose tree printer
 public struct TreePrinter(Int32 depth = 0) : IVisitor
 {
-    public void Visit<T>(T rule) where T : IRule, allows ref struct
+    public void Visit<T>(in T rule) where T : IRule, allows ref struct
     {
         var indent = new String(' ', depth * 2);
         var checker = new ChildChecker();
@@ -1201,8 +1258,36 @@ public struct ChildChecker : IVisitor
 {
     public Boolean HasChildren { get; private set; }
 
-    public void Visit<T>(T rule) where T : IRule, allows ref struct
+    public void Visit<T>(in T rule) where T : IRule, allows ref struct
     {
         HasChildren = true;
+    }
+}
+
+public struct AncestorPrinter(List<String> ancestors, Int32 depth) : IVisitor
+{
+    public AncestorPrinter() : this(new List<String>(), 0) { }
+
+    public void Visit<T>(in T rule) where T : IRule, allows ref struct
+    {
+        var name = typeof(T).Name;
+        ancestors.Add(name);
+
+        var indent = new String(' ', depth * 2);
+        var checker = new ChildChecker();
+        rule.VisitChildren(ref checker);
+
+        if (checker.HasChildren)
+        {
+            Console.WriteLine($"{indent}{name}  [{String.Join(" > ", ancestors)}]");
+            var child = new AncestorPrinter(ancestors, depth + 1);
+            rule.VisitChildren(ref child);
+        }
+        else
+        {
+            Console.WriteLine($"{indent}{name}: {rule.Text}  [{String.Join(" > ", ancestors)}]");
+        }
+
+        ancestors.RemoveAt(ancestors.Count - 1);
     }
 }
