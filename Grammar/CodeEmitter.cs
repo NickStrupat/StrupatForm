@@ -245,7 +245,7 @@ public static class CodeEmitter
     {
         RuleRef rr => rr.Name + QuantifierSuffix(rr.Quantifier),
         Literal<String> ls => $"\"{ls.Value}\"",
-        Literal<Char> lc => $"'{lc.Value}'",
+        Literal<Char> lc => $"'{EscapeChar(lc.Value)}'",
         Class c => ClassToString(c),
         Alternative a => "(" + String.Join(" ", a.Items.Select(ItemToString)) + ")" + QuantifierSuffix(a.Quantifier),
         _ => "?"
@@ -253,9 +253,17 @@ public static class CodeEmitter
 
     static String ClassToString(Class c)
     {
-        var inner = String.Join("", c.Ranges.Select(r => r.ToString()));
+        var inner = String.Join("", c.Ranges.Select(RangeToString));
         return (c.Negated ? "[^" : "[") + inner + "]";
     }
+
+    static String RangeToString(Range r) => r switch
+    {
+        CharacterRange cr when cr.From == cr.To => EscapeChar((Char)cr.From.Value),
+        CharacterRange cr => $"{EscapeChar((Char)cr.From.Value)}-{EscapeChar((Char)cr.To.Value)}",
+        RegexCharacterRange rcr => rcr.Pattern,
+        _ => r.ToString() ?? ""
+    };
 
     static String QuantifierSuffix(Quantifier q) => q.ToString() switch
     {
@@ -757,12 +765,14 @@ public static class CodeEmitter
         w.Line("public Input Text => input[..Length];");
 
         w.Blank();
-        var hasInlineRepetition = items.Any(i => i is Alternative { Quantifier.Max: null });
+        var hasRepetition = items.Any(i =>
+            (i is Alternative { Quantifier.Max: null }) ||
+            (i is RuleRef rr2 && rr2.Quantifier.Max == null));
         var ruleId = ctx.GetRuleId(rule);
         w.Line("public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct");
         w.Line("{");
         w.PushIndent();
-        if (hasInlineRepetition)
+        if (hasRepetition)
         {
             EmitSequenceVisitChildrenWithRepetition(items, nonTerminals, propertyNames, ruleId, ctx);
         }
@@ -809,7 +819,7 @@ public static class CodeEmitter
             }
             else if (item is Literal<Char> lc)
             {
-                w.Line($"if (input[pos] != '{EscapeChar(lc.Value)}')");
+                w.Line($"if (pos >= input.Length || input[pos] != '{EscapeChar(lc.Value)}')");
                 w.PushIndent();
                 w.Line("throw new ParseException(new ParseError());");
                 w.PopIndent();
@@ -827,6 +837,33 @@ public static class CodeEmitter
                     if (!isLast) w.Line("pos += SkipWhitespace(input[pos..]);");
                     ntIndex++;
                 }
+                else if (rr.Quantifier.Max == null)
+                {
+                    if (rr.Quantifier.Min >= 1)
+                    {
+                        w.Line($"var first{rr.Name} = new {rr.Name}(input[pos..]);");
+                        w.Line($"pos += first{rr.Name}.Length;");
+                    }
+                    w.Line("while (true)");
+                    w.Line("{");
+                    w.PushIndent();
+                    w.Line("try");
+                    w.Line("{");
+                    w.PushIndent();
+                    w.Line($"var next{rr.Name} = new {rr.Name}(input[pos..]);");
+                    w.Line($"pos += next{rr.Name}.Length;");
+                    w.PopIndent();
+                    w.Line("}");
+                    w.Line("catch (ParseException)");
+                    w.Line("{");
+                    w.PushIndent();
+                    w.Line("break;");
+                    w.PopIndent();
+                    w.Line("}");
+                    w.PopIndent();
+                    w.Line("}");
+                    if (!isLast) w.Line("pos += SkipWhitespace(input[pos..]);");
+                }
             }
             else if (item is Alternative subAlt && subAlt.Quantifier.Max == null)
             {
@@ -841,6 +878,7 @@ public static class CodeEmitter
     {
         var w = ctx.W;
         var ntIndex = 0;
+        var declaredPos = false;
         for (var i = 0; i < items.Count; i++)
         {
             var item = items[i];
@@ -849,12 +887,55 @@ public static class CodeEmitter
                 var name = propertyNames[ntIndex];
                 w.Line($"var {CamelCase(name)} = new {rr.Name}(input[{CamelCase(name)}Start..], input, {ruleId});");
                 w.Line($"visitor.Visit({CamelCase(name)});");
-                w.Line($"var pos = {CamelCase(name)}Start + {CamelCase(name)}.Length;");
+                if (!declaredPos)
+                {
+                    w.Line($"var pos = {CamelCase(name)}Start + {CamelCase(name)}.Length;");
+                    declaredPos = true;
+                }
+                else
+                {
+                    w.Line($"pos = {CamelCase(name)}Start + {CamelCase(name)}.Length;");
+                }
                 ntIndex++;
+            }
+            else if (item is RuleRef qrr && qrr.Quantifier.Max == null)
+            {
+                if (!declaredPos)
+                {
+                    w.Line("var pos = 0;");
+                    declaredPos = true;
+                }
+                w.Line("while (pos < Length)");
+                w.Line("{");
+                w.PushIndent();
+                w.Line("try");
+                w.Line("{");
+                w.PushIndent();
+                w.Line($"var next{qrr.Name} = new {qrr.Name}(input[pos..], input, {ruleId});");
+                w.Line($"visitor.Visit(next{qrr.Name});");
+                w.Line($"pos += next{qrr.Name}.Length;");
+                w.PopIndent();
+                w.Line("}");
+                w.Line("catch (ParseException)");
+                w.Line("{");
+                w.PushIndent();
+                w.Line("break;");
+                w.PopIndent();
+                w.Line("}");
+                w.PopIndent();
+                w.Line("}");
             }
             else if (item is Alternative subAlt && subAlt.Quantifier.Max == null)
             {
+                if (!declaredPos)
+                {
+                    w.Line("var pos = 0;");
+                    declaredPos = true;
+                }
                 w.Line("while (pos < Length)");
+                w.Line("{");
+                w.PushIndent();
+                w.Line("try");
                 w.Line("{");
                 w.PushIndent();
                 w.Line("pos += SkipWhitespace(input[pos..]);");
@@ -867,7 +948,20 @@ public static class CodeEmitter
                         w.Line($"pos += next{subRr.Name}.Length;");
                         w.Line("pos += SkipWhitespace(input[pos..]);");
                     }
+                    else if (subItem is Literal<Char> subLc)
+                    {
+                        w.Line($"if (pos >= input.Length || input[pos] != '{EscapeChar(subLc.Value)}') break;");
+                        w.Line("pos += 1;");
+                    }
+                    else if (subItem is Literal<String> subLs)
+                    {
+                        w.Line($"if (!input[pos..].StartsWith(\"{EscapeString(subLs.Value)}\")) break;");
+                        w.Line($"pos += {subLs.Value.Length};");
+                    }
                 }
+                w.PopIndent();
+                w.Line("}");
+                w.Line("catch (ParseException) { break; }");
                 w.PopIndent();
                 w.Line("}");
             }

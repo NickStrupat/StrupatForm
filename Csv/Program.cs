@@ -2,7 +2,7 @@
 using System.Text.RegularExpressions;
 
 const String csv = """
-                   1,2,3
+                   1,"2,3
                    4,5,6
                    7,8,9
                    """;
@@ -10,7 +10,7 @@ const String csv = """
 var csvFile = new CsvFile(csv);
 foreach (var row in csvFile.Row)
 {
-	foreach (var field in row.Field)
+	foreach (var field in row.Fields)
 		Console.Out.Write(field.Value);
 	Console.WriteLine();
 }
@@ -70,11 +70,11 @@ public readonly ref struct Row
 	public Row(ReadOnlySpan<Char> input)
 	{
 		this.input = input;
-		Field = new(this.input);
-		Length = Field.Length;
+		Fields = new(this.input);
+		Length = Fields.Length;
 	}
 
-	public FieldEnumerable Field { get; }
+	public FieldEnumerable Fields { get; }
 
 	public ReadOnlySpan<Char> Text => input[..Length];
 	public Int32 Length { get; }

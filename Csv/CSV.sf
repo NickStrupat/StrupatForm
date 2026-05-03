@@ -1,15 +1,19 @@
-File
-	Row*
+File -> Row+
 
-Row
-	Field (',' Field)* '\n'
+Row -> Field (',' Field)* '\n'
 
 Field
-	Quoted
-	Simple
+	QuotedField
+	SimpleField
 
-QuotedField
-	/"((\"\"|[^"])*)"/
+QuotedField -> '"' QuotedChar* '"'
 
-SimpleField
-	/[^,\n\r"]+/
+QuotedChar
+	EscapedQuote
+	NonQuoteChar
+
+NonQuoteChar -> [^\"]
+
+EscapedQuote -> '"' '"'
+
+SimpleField -> [^,\n\r\"]+

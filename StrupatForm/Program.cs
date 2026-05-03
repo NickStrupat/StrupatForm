@@ -1,36 +1,22 @@
-﻿using Antlr4.Runtime;
-using GeneratedParser;
+using Antlr4.Runtime;
 using StrupatForm;
 
-var sample = """
-function main {
-    var x = 42;
-    var name = "hello";
-    x = x + 1;
-    return x;
+if (args.Length == 0)
+{
+    Console.Error.WriteLine("Usage: StrupatForm <grammar.sf> [namespace]");
+    return 1;
 }
-""";
 
-const String path = "grammar.sf";
+var path = args[0];
+var namespaceName = args.Length > 1 ? args[1] : Path.GetFileNameWithoutExtension(path);
+
 var text = File.ReadAllText(path);
-var stream = new CodePointCharStream(text) {name = path};
+var stream = new CodePointCharStream(text) { name = path };
 var lexer = new StrupatFormLexer(stream);
 var tokens = new CommonTokenStream(lexer);
 var parser = new StrupatFormParser(tokens);
 var grammarCtx = parser.grammar_();
 var grammar = grammarCtx.ToGrammar();
 
-var emitted = CodeEmitter.Emit(grammar, "GeneratedParser");
-File.WriteAllText("GeneratedParser.cs", emitted);
-Console.WriteLine("Generated parser written to GeneratedParser.cs");
-Console.WriteLine($"({emitted.Split('\n').Length} lines)");
-
-Console.WriteLine("\n--- Parse tree ---");
-var cu = new CompilationUnit(sample);
-var treePrinter = new TreePrinter();
-treePrinter.Visit(cu);
-
-Console.WriteLine("\n--- Ancestor view ---");
-var cu2 = new CompilationUnit(sample);
-var ancestorPrinter = new AncestorPrinter();
-ancestorPrinter.Visit(cu2);
+Console.Write(CodeEmitter.Emit(grammar, namespaceName));
+return 0;
