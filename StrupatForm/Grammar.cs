@@ -802,18 +802,81 @@ public readonly ref struct ReturnStatement : IRule
     }
 }
 
-// Expression
-//     PrimaryExpression
-//     UnaryExpression
-//     BinaryExpression
+// Expression -> Atom (BinaryOperator Atom)*
 public readonly ref struct Expression : IRule
 {
     private readonly Input input;
-    private readonly Byte index;
-    private readonly Int32 leftLength;
+    private readonly Int32 atomStart;
     public Int32 Length { get; }
 
     public Expression(Input input)
+    {
+        this.input = input;
+        var pos = 0;
+        atomStart = pos;
+        var atom = new Atom(input[pos..]);
+        pos += atom.Length;
+        while (true)
+        {
+            var savedPos = pos;
+            try
+            {
+                pos += SkipWhitespace(input[pos..]);
+                var binOp = new BinaryOperator(input[pos..]);
+                pos += binOp.Length;
+                pos += SkipWhitespace(input[pos..]);
+                var nextAtom = new Atom(input[pos..]);
+                pos += nextAtom.Length;
+            }
+            catch (ParseException)
+            {
+                pos = savedPos;
+                break;
+            }
+        }
+        Length = pos;
+    }
+
+    public Atom Atom => new(input[atomStart..]);
+    public Input Text => input[..Length];
+
+    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
+    {
+        var atom = new Atom(input[atomStart..]);
+        visitor.Visit(atom);
+        var pos = atomStart + atom.Length;
+        while (pos < Length)
+        {
+            pos += SkipWhitespace(input[pos..]);
+            var binOp = new BinaryOperator(input[pos..]);
+            visitor.Visit(binOp);
+            pos += binOp.Length;
+            pos += SkipWhitespace(input[pos..]);
+            var nextAtom = new Atom(input[pos..]);
+            visitor.Visit(nextAtom);
+            pos += nextAtom.Length;
+        }
+    }
+
+    private static Int32 SkipWhitespace(Input input)
+    {
+        var i = 0;
+        while (i < input.Length && Char.IsWhiteSpace(input[i]))
+            i++;
+        return i;
+    }
+}
+
+// Atom
+//     PrimaryExpression
+//     UnaryExpression
+public readonly ref struct Atom : IRule
+{
+    private readonly Input input;
+    private readonly Byte index;
+    public Int32 Length { get; }
+
+    public Atom(Input input)
     {
         this.input = input;
         if (input.Length > 0 && input[0] == '!')
@@ -821,26 +884,12 @@ public readonly ref struct Expression : IRule
             var ue = new UnaryExpression(input);
             index = 2;
             Length = ue.Length;
-            leftLength = 0;
         }
         else
         {
             var pe = new PrimaryExpression(input);
-            var pos = pe.Length;
-            var ws = SkipWhitespace(input[pos..]);
-            if (HasBinaryOperator(input[(pos + ws)..]))
-            {
-                leftLength = pe.Length;
-                var be = new BinaryExpression(input, leftLength);
-                index = 3;
-                Length = be.Length;
-            }
-            else
-            {
-                index = 1;
-                Length = pe.Length;
-                leftLength = 0;
-            }
+            index = 1;
+            Length = pe.Length;
         }
     }
 
@@ -852,7 +901,6 @@ public readonly ref struct Expression : IRule
         {
             case 1: visitor.Visit(new PrimaryExpression(input)); break;
             case 2: visitor.Visit(new UnaryExpression(input)); break;
-            case 3: visitor.Visit(new BinaryExpression(input, leftLength)); break;
         }
     }
 
@@ -863,7 +911,6 @@ public readonly ref struct Expression : IRule
             case 0: throw new UninitializedInstanceException();
             case 1: visitor.Visit(new PrimaryExpression(input)); break;
             case 2: visitor.Visit(new UnaryExpression(input)); break;
-            case 3: visitor.Visit(new BinaryExpression(input, leftLength)); break;
             case Byte.MaxValue: visitor.Visit(new ParseError()); break;
             default: throw new ArgumentOutOfRangeException(nameof(index));
         }
@@ -874,32 +921,6 @@ public readonly ref struct Expression : IRule
         void Visit(in ParseError parseError);
         void Visit(in PrimaryExpression primaryExpression);
         void Visit(in UnaryExpression unaryExpression);
-        void Visit(in BinaryExpression binaryExpression);
-    }
-
-    private static Int32 SkipWhitespace(Input input)
-    {
-        var i = 0;
-        while (i < input.Length && Char.IsWhiteSpace(input[i]))
-            i++;
-        return i;
-    }
-
-    private static Boolean HasBinaryOperator(Input input)
-    {
-        if (input.Length >= 2)
-        {
-            Input twoChar = input[..2];
-            if (twoChar is "&&" or "||" or "==" or "!=" or "<=" or ">=")
-                return true;
-        }
-        if (input.Length >= 1)
-        {
-            Input oneChar = input[..1];
-            if (oneChar is "<" or ">" or "+" or "-" or "*" or "/" or "%")
-                return true;
-        }
-        return false;
     }
 }
 
@@ -1000,66 +1021,6 @@ public readonly ref struct UnaryExpression : IRule
     }
 }
 
-// BinaryExpression -> Expression BinaryOperator Expression
-public readonly ref struct BinaryExpression : IRule
-{
-    private readonly Input input;
-    private readonly Int32 leftLength;
-    private readonly Int32 operatorStart;
-    private readonly Int32 operatorLength;
-    private readonly Int32 rightStart;
-    public Int32 Length { get; }
-
-    public BinaryExpression(Input input, Int32 leftLength)
-    {
-        this.input = input;
-        this.leftLength = leftLength;
-        var pos = leftLength;
-        pos += SkipWhitespace(input[pos..]);
-        operatorStart = pos;
-        operatorLength = 0;
-        if (pos + 1 < input.Length)
-        {
-            Input twoChar = input[pos..(pos + 2)];
-            if (twoChar is "&&" or "||" or "==" or "!=" or "<=" or ">=")
-                operatorLength = 2;
-        }
-        if (operatorLength == 0 && pos < input.Length)
-        {
-            Input oneChar = input[pos..(pos + 1)];
-            if (oneChar is "<" or ">" or "+" or "-" or "*" or "/" or "%")
-                operatorLength = 1;
-        }
-        if (operatorLength == 0)
-            throw new ParseException(new ParseError());
-        pos += operatorLength;
-        pos += SkipWhitespace(input[pos..]);
-        rightStart = pos;
-        var right = new Expression(input[pos..]);
-        pos += right.Length;
-        Length = pos;
-    }
-
-    public Expression Left => new(input[..leftLength]);
-    public BinaryOperator Operator => new(operatorStart..(operatorStart + operatorLength));
-    public Expression Right => new(input[rightStart..]);
-    public Input Text => input[..Length];
-
-    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
-    {
-        visitor.Visit(Left);
-        visitor.Visit(Right);
-    }
-
-    private static Int32 SkipWhitespace(Input input)
-    {
-        var i = 0;
-        while (i < input.Length && Char.IsWhiteSpace(input[i]))
-            i++;
-        return i;
-    }
-}
-
 // UnaryOperator -> "!"
 public readonly ref struct UnaryOperator : IRule
 {
@@ -1086,26 +1047,30 @@ public readonly ref struct UnaryOperator : IRule
 }
 
 // BinaryOperator -> "&&" | "||" | "==" | "!=" | "<" | "<=" | ">" | ">=" | "+" | "-" | "*" | "/" | "%"
-public readonly struct BinaryOperator(Range range)
+public readonly ref struct BinaryOperator : IRule
 {
-    public Range Range => range;
-    public Input Text(Input input) => input[range];
+    private readonly Input input;
+    public Int32 Length { get; }
 
-    public static void Parse<T>(Input input, T visitor) where T : IVisitor
+    public BinaryOperator(Input input)
     {
-        switch (input)
+        this.input = input;
+        if (input.Length >= 2 && input[..2] is "&&" or "||" or "==" or "!=" or "<=" or ">=")
         {
-            case "&&" or "||" or "==" or "!=" or "<=" or ">=": visitor.Visit(new BinaryOperator(..2)); break;
-            case "<" or ">" or "+" or "-" or "*" or "/" or "%": visitor.Visit(new BinaryOperator(..1)); break;
-            default: visitor.Visit(new ParseError()); break;
+            Length = 2;
+            return;
         }
+        if (input.Length >= 1 && input[..1] is "<" or ">" or "+" or "-" or "*" or "/" or "%")
+        {
+            Length = 1;
+            return;
+        }
+        throw new ParseException(new ParseError());
     }
 
-    public interface IVisitor
-    {
-        void Visit(in ParseError parseError);
-        void Visit(in BinaryOperator binaryOperator);
-    }
+    public Input Text => input[..Length];
+
+    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }
 }
 
 // Literal

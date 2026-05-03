@@ -44,10 +44,11 @@ AssignmentStatement
 ReturnStatement
 	"return" Expression
 
-Expression
+Expression -> Atom (BinaryOperator Atom)*
+
+Atom
 	PrimaryExpression
 	UnaryExpression
-	BinaryExpression
 
 PrimaryExpression
 	Identifier
@@ -55,9 +56,6 @@ PrimaryExpression
 
 UnaryExpression
 	UnaryOperator Expression
-
-BinaryExpression
-	Expression BinaryOperator Expression
 
 UnaryOperator
 	"!"
@@ -83,4 +81,4 @@ Literal
 	'0' [xX] [0-9a-fA-F]+
 
 QualifiedIdentifier -> Identifier ('.' Identifier)*
-Identifier -> \w [\w\d]+
+Identifier -> [\w] [\w\d]*

@@ -29,6 +29,6 @@ public static class StringExtensions
 			};
 
 		static String HexToString(String s, System.Range r) =>
-			new Rune(UInt32.Parse(s.AsSpan()[r], NumberStyles.AllowHexSpecifier)).ToString();
+			"";//new Rune(UInt32.Parse(s.AsSpan()[r], NumberStyles.AllowHexSpecifier)).ToString();
 	}
 }

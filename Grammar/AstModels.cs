@@ -14,6 +14,7 @@ public sealed class Rule
 	public required String Name { get; init; }
 	public List<Alternative> Alternatives { get; } = new();
 	public override String ToString() => Name;
+	public Int32 RefCount { get; set; }
 }
 
 public sealed class Alternative : Item

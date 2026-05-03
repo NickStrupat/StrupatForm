@@ -5,7 +5,7 @@ using static StrupatForm.StrupatFormParser;
 
 namespace StrupatForm;
 
-static class ParserRuleExtensions
+public static class ParserRuleExtensions
 {
 	public static TTo To<TTo>(this IParseTree o) where TTo : IParseTree => (TTo) o;
 
@@ -34,9 +34,9 @@ static class ParserRuleExtensions
 		return rule;
 	}
 
-	public static Alternative ToAlternative(this AlternativeContext context, Grammar grammar)
+	public static Alternative ToAlternative(this AlternativeContext context, Grammar grammar, Quantifier? quantifier = null)
 	{
-		var alternative = new Alternative {Quantifier = new() {Min = 1, Max = 1}};
+		var alternative = new Alternative {Quantifier = quantifier ?? new() {Min = 1, Max = 1}};
 		foreach (var item in context.item())
 			alternative.Items.Add(item.ToItem(grammar));
 		return alternative;
@@ -51,7 +51,7 @@ static class ParserRuleExtensions
 			RuleRefContext ruleRefContext => ruleRefContext.ToRuleRef(grammar, quantifier),
 			LiteralContext literalContext => literalContext.ToLiteral(quantifier),
 			ClassContext classContext => classContext.ToClass(quantifier),
-			AlternativeContext alternativeContext => alternativeContext.ToAlternative(grammar),
+			AlternativeContext alternativeContext => alternativeContext.ToAlternative(grammar, quantifier),
 			_ => throw new("Unknown item type: " + childContext.GetType().Name)
 		};
 	}
@@ -60,7 +60,8 @@ static class ParserRuleExtensions
 	{
 		var name = context.name().GetText();
 		var rule = grammar.Rules.Get(name);
-		return new RuleRef {Name = name, Rule = rule, Quantifier = quantifier};
+		rule.RefCount++;
+		return new RuleRef { Name = name, Rule = rule, Quantifier = quantifier };
 	}
 
 	public static Literal ToLiteral(this LiteralContext context, Quantifier quantifier)

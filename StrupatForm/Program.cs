@@ -16,32 +16,53 @@ function main {
 }
 """;
 
-var cu = new CompilationUnit(sample);
-var treePrinter = new TreePrinter();
-treePrinter.Visit(cu);
-return;
-
-// var source = """
-//              One
-//              Two
-//              """.AsSpan();
-// var g = new Grammar(source);
-// foreach (var rule in g.Rules)
-// {
-// 	Console.Out.WriteLine(rule.Name);
-// }
-// return;
-
 const String path = "grammar.sf";
 var text = File.ReadAllText(path);
 var stream = new CodePointCharStream(text) {name = path};
 var lexer = new StrupatFormLexer(stream);
 var tokens = new CommonTokenStream(lexer);
-//Console.WriteLine(string.Join('\n', lexer.GetAllTokens().Where(x => !String.IsNullOrWhiteSpace(x.Text)).Select(x => $"{GetName(x),-20}{x.Text}")));
 var parser = new StrupatFormParser(tokens);
 var grammarCtx = parser.grammar_();
 var grammar = grammarCtx.ToGrammar();
-var rules = grammar.Rules.OrderBy(x => x.RefCount).ToList();
+
+var emitted = CodeEmitter.Emit(grammar, "GeneratedParser");
+File.WriteAllText("GeneratedParser.cs", emitted);
+Console.WriteLine("Generated parser written to GeneratedParser.cs");
+Console.WriteLine($"({emitted.Split('\n').Length} lines)");
+
+Console.WriteLine("\n--- Hand-written parser ---");
+var cu = new CompilationUnit(sample);
+var treePrinter = new TreePrinter();
+treePrinter.Visit(cu);
+
+#if TESTGEN
+Console.WriteLine("\n--- Generated parser ---");
+var simpleTest = "function main { x = x + 1; }";
+try
+{
+    var gcu = new GeneratedParser.CompilationUnit(simpleTest);
+    var gtp = new GeneratedParser.TreePrinter();
+    gtp.Visit(gcu);
+    Console.WriteLine("Simple test passed!");
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"Simple test error: {ex.GetType().Name} at {ex.StackTrace?.Split('\n')[0]}");
+}
+
+try
+{
+    var gcu = new GeneratedParser.CompilationUnit(sample);
+    var gtp = new GeneratedParser.TreePrinter();
+    gtp.Visit(gcu);
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"\nFull test error: {ex.GetType().Name} at {ex.StackTrace?.Split('\n')[0]}");
+}
+#endif
+
+return;
 // if (ExampleOfGeneratedParser.Grammar.TryParse("asdf".AsMemory(), out var x, out var e))
 // 	;
 // else
