@@ -1,0 +1,12 @@
+<Solution>
+  <Project Path="BuildTask.Sample/BuildTask.Sample.csproj" />
+  <Project Path="BuildTask/BuildTask.csproj" />
+  <Project Path="Csv.Tests/Csv.Tests.csproj" />
+  <Project Path="Csv/Csv.csproj" />
+  <Project Path="Grammar/Grammar.csproj" />
+  <Project Path="ParserGenerator/ParserGenerator.Sample/ParserGenerator.Sample.csproj" />
+  <Project Path="ParserGenerator/ParserGenerator.Tests/ParserGenerator.Tests.csproj" />
+  <Project Path="ParserGenerator/ParserGenerator/ParserGenerator.csproj" />
+  <Project Path="StrupatForm/StrupatForm.csproj" />
+  <Project Path="Tests/Tests.csproj" />
+</Solution>
