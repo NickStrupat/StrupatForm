@@ -1,0 +1,100 @@
+{
+    "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+    "name": "StrupatForm",
+    "scopeName": "source.sf",
+    "fileTypes": ["sf"],
+    "patterns": [
+        { "include": "#rule-definition-inline" },
+        { "include": "#rule-definition-heading" },
+        { "include": "#indented-alternative" }
+    ],
+    "repository": {
+        "rule-definition-inline": {
+            "match": "^([A-Za-z_]\\w*)(\\s+->\\s+)(.*)",
+            "captures": {
+                "1": { "name": "entity.name.type.rule.sf" },
+                "2": { "name": "keyword.operator.arrow.sf" },
+                "3": { "patterns": [{ "include": "#alternative" }] }
+            }
+        },
+        "rule-definition-heading": {
+            "match": "^([A-Za-z_]\\w*)\\s*$",
+            "captures": {
+                "1": { "name": "entity.name.type.rule.sf" }
+            }
+        },
+        "indented-alternative": {
+            "match": "^(?:\\t|    )(.+)",
+            "captures": {
+                "1": { "patterns": [{ "include": "#alternative" }] }
+            }
+        },
+        "alternative": {
+            "patterns": [
+                { "include": "#string-literal" },
+                { "include": "#char-literal" },
+                { "include": "#character-class" },
+                { "include": "#arrow-operator" },
+                { "include": "#quantifier" },
+                { "include": "#group-parens" },
+                { "include": "#rule-reference" }
+            ]
+        },
+        "arrow-operator": {
+            "match": "->",
+            "name": "keyword.operator.arrow.sf"
+        },
+        "string-literal": {
+            "begin": "\"",
+            "end": "\"",
+            "name": "string.quoted.double.sf",
+            "patterns": [{ "include": "#escape-sequence" }]
+        },
+        "char-literal": {
+            "begin": "'",
+            "end": "'",
+            "name": "string.quoted.single.sf",
+            "patterns": [{ "include": "#escape-sequence" }]
+        },
+        "escape-sequence": {
+            "match": "\\\\[0\\\\tnr\"']",
+            "name": "constant.character.escape.sf"
+        },
+        "character-class": {
+            "begin": "\\[",
+            "end": "\\]",
+            "beginCaptures": { "0": { "name": "punctuation.definition.character-class.begin.sf" } },
+            "endCaptures": { "0": { "name": "punctuation.definition.character-class.end.sf" } },
+            "name": "constant.other.character-class.sf",
+            "patterns": [
+                {
+                    "match": "\\^",
+                    "name": "keyword.operator.negation.sf"
+                },
+                {
+                    "match": "\\\\[wWdDsS]",
+                    "name": "constant.character.escape.shorthand.sf"
+                },
+                {
+                    "match": "\\\\[^\\n]",
+                    "name": "constant.character.escape.sf"
+                }
+            ]
+        },
+        "quantifier": {
+            "match": "[?*+]",
+            "name": "keyword.operator.quantifier.sf"
+        },
+        "group-parens": {
+            "begin": "\\(",
+            "end": "\\)",
+            "beginCaptures": { "0": { "name": "punctuation.section.group.begin.sf" } },
+            "endCaptures": { "0": { "name": "punctuation.section.group.end.sf" } },
+            "patterns": [{ "include": "#alternative" }]
+        },
+        "rule-reference": {
+            "match": "[A-Za-z_]\\w*",
+            "name": "variable.other.rule-reference.sf"
+        }
+    }
+}
