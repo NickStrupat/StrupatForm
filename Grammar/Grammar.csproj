@@ -7,14 +7,9 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
-        <PackageReference Include="Antlr4BuildTasks" Version="12.14.0" />
-    </ItemGroup>
-
-    <ItemGroup>
-        <Antlr4 Include="StrupatForm.g4">
-            <Package>StrupatForm</Package>
-        </Antlr4>
+      <None Update="StrupatForm.sf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
     </ItemGroup>
 
 </Project>

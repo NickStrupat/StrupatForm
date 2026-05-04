@@ -1,0 +1,78 @@
+Grammar -> Rule ('\n' '\n'+ Rule)*
+
+Rule -> Name Alternatives
+
+Name -> [\w] [\w\d]*
+
+Alternatives
+	InlineAlternatives
+	IndentedAlternatives
+
+InlineAlternatives -> ' ' '-' '>' ' ' Alternative
+
+IndentedAlternatives -> IndentedAlternative+
+
+IndentedAlternative -> '\n' Indentation Alternative
+
+Indentation
+	'\t'
+	"    "
+
+Alternative -> Item (' ' Item)*
+
+Item -> Atom Quantifier?
+
+Atom
+	Group
+	RuleRef
+	StringLiteral
+	CharLiteral
+	Class
+
+Group -> '(' Alternative ')'
+
+RuleRef -> Name
+
+CharLiteral -> '\'' CharLiteralContent '\''
+
+CharLiteralContent
+	EscapedChar
+	PlainChar
+
+PlainChar -> [^\\\']
+
+StringLiteral -> '"' StringChar* '"'
+
+StringChar
+	EscapedChar
+	PlainStringChar
+
+PlainStringChar -> [^\\\"]
+
+EscapedChar -> '\\' [0\\tnr\"\']
+
+Quantifier
+	'?'
+	'*'
+	'+'
+
+Class -> '[' '^'? ClassRange+ ']'
+
+ClassRange
+	CharRange
+	ShorthandClass
+	SingleClassChar
+
+CharRange -> ClassChar '-' ClassChar
+
+SingleClassChar -> ClassChar
+
+ShorthandClass -> '\\' [wWdDsS]
+
+ClassChar
+	ClassEscapedChar
+	ClassLetterOrDigit
+
+ClassLetterOrDigit -> [^\]\\\-]
+
+ClassEscapedChar -> '\\' [^\n]
