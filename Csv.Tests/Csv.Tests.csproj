@@ -30,8 +30,7 @@
     <Target Name="GenerateParser" BeforeTargets="CoreCompile"
             Inputs="$(MSBuildProjectDirectory)/../Csv/CSV.sf"
             Outputs="$(MSBuildProjectDirectory)/CsvParser.g.cs">
-        <Exec Command="dotnet build $(MSBuildProjectDirectory)/../StrupatForm/StrupatForm.csproj -v q -nologo" StandardOutputImportance="low" />
-        <Exec Command="dotnet exec $(MSBuildProjectDirectory)/../StrupatForm/bin/Debug/net10.0/StrupatForm.dll $(MSBuildProjectDirectory)/../Csv/CSV.sf CsvParser > $(MSBuildProjectDirectory)/CsvParser.g.cs" />
+        <Exec Command="dotnet run --project $(MSBuildProjectDirectory)/../StrupatForm/StrupatForm.csproj -v q -- $(MSBuildProjectDirectory)/../Csv/CSV.sf CsvParser > $(MSBuildProjectDirectory)/CsvParser.g.cs" />
     </Target>
 
 </Project>
