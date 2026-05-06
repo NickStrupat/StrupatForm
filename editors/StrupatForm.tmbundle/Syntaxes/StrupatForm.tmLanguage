@@ -108,6 +108,10 @@
                 </dict>
                 <dict>
                     <key>include</key>
+                    <string>#brace-quantifier</string>
+                </dict>
+                <dict>
+                    <key>include</key>
                     <string>#quantifier</string>
                 </dict>
                 <dict>
@@ -139,6 +143,10 @@
             <array>
                 <dict>
                     <key>include</key>
+                    <string>#unicode-escape</string>
+                </dict>
+                <dict>
+                    <key>include</key>
                     <string>#escape-sequence</string>
                 </dict>
             </array>
@@ -155,9 +163,20 @@
             <array>
                 <dict>
                     <key>include</key>
+                    <string>#unicode-escape</string>
+                </dict>
+                <dict>
+                    <key>include</key>
                     <string>#escape-sequence</string>
                 </dict>
             </array>
+        </dict>
+        <key>unicode-escape</key>
+        <dict>
+            <key>match</key>
+            <string>\\(?:x\{[0-9a-fA-F]{1,8}\}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8})</string>
+            <key>name</key>
+            <string>constant.character.escape.unicode.sf</string>
         </dict>
         <key>escape-sequence</key>
         <dict>
@@ -200,6 +219,12 @@
                 </dict>
                 <dict>
                     <key>match</key>
+                    <string>\\p\{[\w=]+\}</string>
+                    <key>name</key>
+                    <string>constant.character.escape.unicode-property.sf</string>
+                </dict>
+                <dict>
+                    <key>match</key>
                     <string>\\[wWdDsS]</string>
                     <key>name</key>
                     <string>constant.character.escape.shorthand.sf</string>
@@ -211,6 +236,13 @@
                     <string>constant.character.escape.sf</string>
                 </dict>
             </array>
+        </dict>
+        <key>brace-quantifier</key>
+        <dict>
+            <key>match</key>
+            <string>\{\d+(?:,\d*)?\}</string>
+            <key>name</key>
+            <string>keyword.operator.quantifier.sf</string>
         </dict>
         <key>quantifier</key>
         <dict>

@@ -2,7 +2,22 @@ Grammar -> Rule ('\n' '\n'+ Rule)*
 
 Rule -> Name Alternatives
 
-Name -> [\w] [\w\d]*
+Name -> NameStart NameContinue*
+
+NameStart
+	Letter
+	OtherLetter
+
+NameContinue
+	Letter
+	OtherLetter
+	Number
+
+Letter -> [\p{Alpha}]
+
+OtherLetter -> [\p{General_Category=Other_Letter}]
+
+Number -> [\p{Decimal_Number}]+
 
 Alternatives
 	InlineAlternatives
@@ -37,6 +52,7 @@ CharLiteral -> '\'' CharLiteralContent '\''
 
 CharLiteralContent
 	EscapedChar
+	UnicodeEscapeChar
 	PlainChar
 
 PlainChar -> [^\\\']
@@ -45,22 +61,56 @@ StringLiteral -> '"' StringChar* '"'
 
 StringChar
 	EscapedChar
+	UnicodeEscapeChar
 	PlainStringChar
 
 PlainStringChar -> [^\\\"]
 
 EscapedChar -> '\\' [0\\tnr\"\']
 
-Quantifier
-	'?'
-	'*'
-	'+'
+UnicodeEscapeChar
+	HexEscape
+	Unicode4Escape
+	Unicode8Escape
 
-Class -> '[' '^'? ClassRange+ ']'
+HexEscape -> '\\' 'x' '{' Hexadec Hexadec? Hexadec? Hexadec? Hexadec? Hexadec? Hexadec? Hexadec? '}'
+
+Unicode4Escape -> '\\' 'u' Hexadec Hexadec Hexadec Hexadec
+
+Unicode8Escape -> '\\' 'U' Hexadec Hexadec Hexadec Hexadec Hexadec Hexadec Hexadec Hexadec
+
+Hexadec -> [0-9a-fA-F]
+
+Quantifier
+	ZeroOrOne
+	ZeroOrMore
+	OneOrMore
+	Exactly
+	AtLeast
+	Between
+
+ZeroOrOne -> '?'
+
+ZeroOrMore -> '*'
+
+OneOrMore -> '+'
+
+Exactly -> '{' Number '}'
+
+AtLeast -> '{' Number ',' '}'
+
+Between -> '{' Number ',' Number '}'
+
+Class
+	BracketedClass
+	ClassRange
+
+BracketedClass -> '[' '^'? ClassRange+ ']'
 
 ClassRange
 	CharRange
 	ShorthandClass
+	UnicodePropertyClass
 	SingleClassChar
 
 CharRange -> ClassChar '-' ClassChar
@@ -76,3 +126,118 @@ ClassChar
 ClassLetterOrDigit -> [^\]\\\-]
 
 ClassEscapedChar -> '\\' [^\n]
+
+UnicodePropertyClass -> '\\' 'p' '{' PropertyName '}'
+
+PropertyName
+	GeneralCategoryProperty
+	CategoryName
+	BinaryProperty
+
+GeneralCategoryProperty -> "General_Category=" CategoryName
+
+CategoryName
+	LetterCategory
+	MarkCategory
+	NumberCategory
+	PunctuationCategory
+	SymbolCategory
+	SeparatorCategory
+	OtherCategory
+
+LetterCategory
+	"L"
+	"Letter"
+	"Lu"
+	"Uppercase_Letter"
+	"Ll"
+	"Lowercase_Letter"
+	"Lt"
+	"Titlecase_Letter"
+	"Lm"
+	"Modifier_Letter"
+	"Lo"
+	"Other_Letter"
+
+MarkCategory
+	"M"
+	"Mark"
+	"Mn"
+	"Nonspacing_Mark"
+	"Mc"
+	"Spacing_Mark"
+	"Me"
+	"Enclosing_Mark"
+
+NumberCategory
+	"N"
+	"Number"
+	"Nd"
+	"Decimal_Number"
+	"Nl"
+	"Letter_Number"
+	"No"
+	"Other_Number"
+
+PunctuationCategory
+	"P"
+	"Punctuation"
+	"Pc"
+	"Connector_Punctuation"
+	"Pd"
+	"Dash_Punctuation"
+	"Ps"
+	"Open_Punctuation"
+	"Pe"
+	"Close_Punctuation"
+	"Pi"
+	"Initial_Punctuation"
+	"Pf"
+	"Final_Punctuation"
+	"Po"
+	"Other_Punctuation"
+
+SymbolCategory
+	"S"
+	"Symbol"
+	"Sm"
+	"Math_Symbol"
+	"Sc"
+	"Currency_Symbol"
+	"Sk"
+	"Modifier_Symbol"
+	"So"
+	"Other_Symbol"
+
+SeparatorCategory
+	"Z"
+	"Separator"
+	"Zs"
+	"Space_Separator"
+	"Zl"
+	"Line_Separator"
+	"Zp"
+	"Paragraph_Separator"
+
+OtherCategory
+	"C"
+	"Other"
+	"Cc"
+	"Control"
+	"Cf"
+	"Format"
+	"Cs"
+	"Surrogate"
+	"Co"
+	"Private_Use"
+	"Cn"
+	"Unassigned"
+
+BinaryProperty
+	"Alpha"
+	"Alphabetic"
+	"Upper"
+	"Uppercase"
+	"Lower"
+	"Lowercase"
+	"White_Space"

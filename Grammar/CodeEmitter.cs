@@ -664,18 +664,73 @@ public static class CodeEmitter
         CharacterRange cr when cr.From == cr.To && IsShorthandChar(cr) => ShorthandCondition(cr, charExpr),
         CharacterRange cr when cr.From == cr.To => $"{charExpr} == '{EscapeChar((Char)cr.From.Value)}'",
         CharacterRange cr => $"({charExpr} >= '{EscapeChar((Char)cr.From.Value)}' && {charExpr} <= '{EscapeChar((Char)cr.To.Value)}')",
-        RegexCharacterRange rcr => rcr.Pattern switch
-        {
-            "\\w" => $"(Char.IsLetter({charExpr}) || {charExpr} == '_')",
-            "\\W" => $"(!Char.IsLetter({charExpr}) && {charExpr} != '_')",
-            "\\d" => $"Char.IsAsciiDigit({charExpr})",
-            "\\D" => $"!Char.IsAsciiDigit({charExpr})",
-            "\\s" => $"Char.IsWhiteSpace({charExpr})",
-            "\\S" => $"!Char.IsWhiteSpace({charExpr})",
-            _ => $"/* unsupported: {rcr.Pattern} */ true"
-        },
+        RegexCharacterRange rcr => RegexRangeToCondition(rcr, charExpr),
         _ => "true"
     };
+
+    static String RegexRangeToCondition(RegexCharacterRange rcr, String charExpr) => rcr.Pattern switch
+    {
+        "\\w" => $"(Char.IsLetter({charExpr}) || {charExpr} == '_')",
+        "\\W" => $"(!Char.IsLetter({charExpr}) && {charExpr} != '_')",
+        "\\d" => $"Char.IsAsciiDigit({charExpr})",
+        "\\D" => $"!Char.IsAsciiDigit({charExpr})",
+        "\\s" => $"Char.IsWhiteSpace({charExpr})",
+        "\\S" => $"!Char.IsWhiteSpace({charExpr})",
+        _ when rcr.Pattern.StartsWith("\\p{") => UnicodeCategoryToCondition(rcr.Pattern[3..^1], charExpr),
+        _ => $"/* unsupported: {rcr.Pattern} */ true"
+    };
+
+    static String UnicodeCategoryToCondition(String property, String charExpr)
+    {
+        if (property.StartsWith("General_Category="))
+            property = property["General_Category=".Length..];
+
+        return property switch
+        {
+            "L" or "Letter" => $"Char.IsLetter({charExpr})",
+            "Lu" or "Uppercase_Letter" => $"Char.IsUpper({charExpr})",
+            "Ll" or "Lowercase_Letter" => $"Char.IsLower({charExpr})",
+            "N" or "Number" => $"Char.IsNumber({charExpr})",
+            "Nd" or "Decimal_Number" => $"Char.IsDigit({charExpr})",
+            "P" or "Punctuation" => $"Char.IsPunctuation({charExpr})",
+            "S" or "Symbol" => $"Char.IsSymbol({charExpr})",
+            "Z" or "Separator" => $"Char.IsSeparator({charExpr})",
+            "C" or "Other" => $"Char.IsControl({charExpr})",
+            "Cc" or "Control" => $"Char.IsControl({charExpr})",
+            "M" or "Mark" => $"(Char.GetUnicodeCategory({charExpr}) is System.Globalization.UnicodeCategory.NonSpacingMark or System.Globalization.UnicodeCategory.SpacingCombiningMark or System.Globalization.UnicodeCategory.EnclosingMark)",
+            "Alpha" or "Alphabetic" => $"Char.IsLetter({charExpr})",
+            "Upper" or "Uppercase" => $"Char.IsUpper({charExpr})",
+            "Lower" or "Lowercase" => $"Char.IsLower({charExpr})",
+            "White_Space" => $"Char.IsWhiteSpace({charExpr})",
+            "Lt" or "Titlecase_Letter" => $"(Char.GetUnicodeCategory({charExpr}) == System.Globalization.UnicodeCategory.TitlecaseLetter)",
+            "Lm" or "Modifier_Letter" => $"(Char.GetUnicodeCategory({charExpr}) == System.Globalization.UnicodeCategory.ModifierLetter)",
+            "Lo" or "Other_Letter" => $"(Char.GetUnicodeCategory({charExpr}) == System.Globalization.UnicodeCategory.OtherLetter)",
+            "Mn" or "Nonspacing_Mark" => $"(Char.GetUnicodeCategory({charExpr}) == System.Globalization.UnicodeCategory.NonSpacingMark)",
+            "Mc" or "Spacing_Mark" => $"(Char.GetUnicodeCategory({charExpr}) == System.Globalization.UnicodeCategory.SpacingCombiningMark)",
+            "Me" or "Enclosing_Mark" => $"(Char.GetUnicodeCategory({charExpr}) == System.Globalization.UnicodeCategory.EnclosingMark)",
+            "Nl" or "Letter_Number" => $"(Char.GetUnicodeCategory({charExpr}) == System.Globalization.UnicodeCategory.LetterNumber)",
+            "No" or "Other_Number" => $"(Char.GetUnicodeCategory({charExpr}) == System.Globalization.UnicodeCategory.OtherNumber)",
+            "Pc" or "Connector_Punctuation" => $"(Char.GetUnicodeCategory({charExpr}) == System.Globalization.UnicodeCategory.ConnectorPunctuation)",
+            "Pd" or "Dash_Punctuation" => $"(Char.GetUnicodeCategory({charExpr}) == System.Globalization.UnicodeCategory.DashPunctuation)",
+            "Ps" or "Open_Punctuation" => $"(Char.GetUnicodeCategory({charExpr}) == System.Globalization.UnicodeCategory.OpenPunctuation)",
+            "Pe" or "Close_Punctuation" => $"(Char.GetUnicodeCategory({charExpr}) == System.Globalization.UnicodeCategory.ClosePunctuation)",
+            "Pi" or "Initial_Punctuation" => $"(Char.GetUnicodeCategory({charExpr}) == System.Globalization.UnicodeCategory.InitialQuotePunctuation)",
+            "Pf" or "Final_Punctuation" => $"(Char.GetUnicodeCategory({charExpr}) == System.Globalization.UnicodeCategory.FinalQuotePunctuation)",
+            "Po" or "Other_Punctuation" => $"(Char.GetUnicodeCategory({charExpr}) == System.Globalization.UnicodeCategory.OtherPunctuation)",
+            "Sm" or "Math_Symbol" => $"(Char.GetUnicodeCategory({charExpr}) == System.Globalization.UnicodeCategory.MathSymbol)",
+            "Sc" or "Currency_Symbol" => $"(Char.GetUnicodeCategory({charExpr}) == System.Globalization.UnicodeCategory.CurrencySymbol)",
+            "Sk" or "Modifier_Symbol" => $"(Char.GetUnicodeCategory({charExpr}) == System.Globalization.UnicodeCategory.ModifierSymbol)",
+            "So" or "Other_Symbol" => $"(Char.GetUnicodeCategory({charExpr}) == System.Globalization.UnicodeCategory.OtherSymbol)",
+            "Zs" or "Space_Separator" => $"(Char.GetUnicodeCategory({charExpr}) == System.Globalization.UnicodeCategory.SpaceSeparator)",
+            "Zl" or "Line_Separator" => $"(Char.GetUnicodeCategory({charExpr}) == System.Globalization.UnicodeCategory.LineSeparator)",
+            "Zp" or "Paragraph_Separator" => $"(Char.GetUnicodeCategory({charExpr}) == System.Globalization.UnicodeCategory.ParagraphSeparator)",
+            "Cf" or "Format" => $"(Char.GetUnicodeCategory({charExpr}) == System.Globalization.UnicodeCategory.Format)",
+            "Cs" or "Surrogate" => $"(Char.GetUnicodeCategory({charExpr}) == System.Globalization.UnicodeCategory.Surrogate)",
+            "Co" or "Private_Use" => $"(Char.GetUnicodeCategory({charExpr}) == System.Globalization.UnicodeCategory.PrivateUse)",
+            "Cn" or "Unassigned" => $"(Char.GetUnicodeCategory({charExpr}) == System.Globalization.UnicodeCategory.OtherNotAssigned)",
+            _ => $"/* unsupported unicode property: {property} */ true"
+        };
+    }
 
     static Boolean IsShorthandChar(CharacterRange cr) =>
         cr.From.Value is 'w' or 'd' or 's';
@@ -688,20 +743,23 @@ public static class CodeEmitter
         _ => $"{charExpr} == '{EscapeChar((Char)cr.From.Value)}'"
     };
 
+    static String RegexRangeToName(RegexCharacterRange rcr) => rcr.Pattern switch
+    {
+        "\\w" => "Word",
+        "\\d" => "Digit",
+        "\\s" => "Space",
+        "\\W" => "NonWord",
+        "\\D" => "NonDigit",
+        "\\S" => "NonSpace",
+        _ when rcr.Pattern.StartsWith("\\p{") => rcr.Pattern[3..^1].Replace("=", "").Replace("_", ""),
+        _ => "Custom"
+    };
+
     static String GetClassHelperName(Class c)
     {
         var parts = c.Ranges.Select(r => r switch
         {
-            RegexCharacterRange rcr => rcr.Pattern switch
-            {
-                "\\w" => "Word",
-                "\\d" => "Digit",
-                "\\s" => "Space",
-                "\\W" => "NonWord",
-                "\\D" => "NonDigit",
-                "\\S" => "NonSpace",
-                _ => "Custom"
-            },
+            RegexCharacterRange rcr => RegexRangeToName(rcr),
             CharacterRange cr when cr.From == cr.To && IsShorthandChar(cr) => ShorthandName(cr),
             CharacterRange cr when cr.From == cr.To => CharName((Char)cr.From.Value),
             CharacterRange cr => $"{CharName((Char)cr.From.Value)}To{CharName((Char)cr.To.Value)}",

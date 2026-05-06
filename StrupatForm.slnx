@@ -4,6 +4,7 @@
   <Project Path="Csv.Tests/Csv.Tests.csproj" />
   <Project Path="Csv/Csv.csproj" />
   <Project Path="Grammar/Grammar.csproj" />
+  <Project Path="Grammar.Tests/Grammar.Tests.csproj" />
   <Project Path="ParserGenerator/ParserGenerator.Sample/ParserGenerator.Sample.csproj" />
   <Project Path="ParserGenerator/ParserGenerator.Tests/ParserGenerator.Tests.csproj" />
   <Project Path="ParserGenerator/ParserGenerator/ParserGenerator.csproj" />

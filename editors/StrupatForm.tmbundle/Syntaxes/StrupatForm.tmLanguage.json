@@ -35,6 +35,7 @@
                 { "include": "#char-literal" },
                 { "include": "#character-class" },
                 { "include": "#arrow-operator" },
+                { "include": "#brace-quantifier" },
                 { "include": "#quantifier" },
                 { "include": "#group-parens" },
                 { "include": "#rule-reference" }
@@ -48,13 +49,23 @@
             "begin": "\"",
             "end": "\"",
             "name": "string.quoted.double.sf",
-            "patterns": [{ "include": "#escape-sequence" }]
+            "patterns": [
+                { "include": "#unicode-escape" },
+                { "include": "#escape-sequence" }
+            ]
         },
         "char-literal": {
             "begin": "'",
             "end": "'",
             "name": "string.quoted.single.sf",
-            "patterns": [{ "include": "#escape-sequence" }]
+            "patterns": [
+                { "include": "#unicode-escape" },
+                { "include": "#escape-sequence" }
+            ]
+        },
+        "unicode-escape": {
+            "match": "\\\\(?:x\\{[0-9a-fA-F]{1,8}\\}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8})",
+            "name": "constant.character.escape.unicode.sf"
         },
         "escape-sequence": {
             "match": "\\\\[0\\\\tnr\"']",
@@ -72,6 +83,10 @@
                     "name": "keyword.operator.negation.sf"
                 },
                 {
+                    "match": "\\\\p\\{[\\w=]+\\}",
+                    "name": "constant.character.escape.unicode-property.sf"
+                },
+                {
                     "match": "\\\\[wWdDsS]",
                     "name": "constant.character.escape.shorthand.sf"
                 },
@@ -80,6 +95,10 @@
                     "name": "constant.character.escape.sf"
                 }
             ]
+        },
+        "brace-quantifier": {
+            "match": "\\{\\d+(?:,\\d*)?\\}",
+            "name": "keyword.operator.quantifier.sf"
         },
         "quantifier": {
             "match": "[?*+]",

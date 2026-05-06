@@ -1,0 +1,8 @@
+Unhandled exception. SfParser.ParseException: Exception of type 'SfParser.ParseException' was thrown.
+   at SfParser.IndentedAlternative..ctor(ReadOnlySpan`1 input, ReadOnlySpan`1 parentInput, Byte parentKind) in /Users/nick/Dev/StrupatForm/Grammar/SfParser.g.cs:line 2737
+   at SfParser.IndentedAlternatives..ctor(ReadOnlySpan`1 input, ReadOnlySpan`1 parentInput, Byte parentKind) in /Users/nick/Dev/StrupatForm/Grammar/SfParser.g.cs:line 2788
+   at SfParser.Alternatives..ctor(ReadOnlySpan`1 input, ReadOnlySpan`1 parentInput, Byte parentKind) in /Users/nick/Dev/StrupatForm/Grammar/SfParser.g.cs:line 2855
+   at SfParser.Rule..ctor(ReadOnlySpan`1 input, ReadOnlySpan`1 parentInput, Byte parentKind) in /Users/nick/Dev/StrupatForm/Grammar/SfParser.g.cs:line 2918
+   at SfParser.Grammar..ctor(ReadOnlySpan`1 input, ReadOnlySpan`1 parentInput, Byte parentKind) in /Users/nick/Dev/StrupatForm/Grammar/SfParser.g.cs:line 2963
+   at StrupatForm.SfGrammarBuilder.Parse(String text) in /Users/nick/Dev/StrupatForm/Grammar/SfGrammarBuilder.cs:line 10
+   at Program.<Main>$(String[] args) in /Users/nick/Dev/StrupatForm/StrupatForm/Program.cs:line 14

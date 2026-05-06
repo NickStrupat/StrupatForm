@@ -153,12 +153,13 @@ public static class SfGrammarBuilder
         try
         {
             var q = new SfParser.Quantifier(item.Text.Slice(item.Atom.Length));
-            var qChar = q.Text[0];
-            return qChar switch
+            var qText = new String(q.Text);
+            return qText[0] switch
             {
                 '?' => new Quantifier { Min = 0, Max = 1 },
                 '*' => new Quantifier { Min = 0, Max = null },
                 '+' => new Quantifier { Min = 1, Max = null },
+                '{' => ParseBraceQuantifier(qText),
                 _ => new Quantifier { Min = 1, Max = 1 }
             };
         }
@@ -166,6 +167,22 @@ public static class SfGrammarBuilder
         {
             return new Quantifier { Min = 1, Max = 1 };
         }
+    }
+
+    static Quantifier ParseBraceQuantifier(String text)
+    {
+        var inner = text[1..^1];
+        var parts = inner.Split(',');
+        if (parts.Length == 1)
+        {
+            var n = UInt32.Parse(parts[0]);
+            return new Quantifier { Min = n, Max = n };
+        }
+        var min = UInt32.Parse(parts[0]);
+        if (String.IsNullOrEmpty(parts[1]))
+            return new Quantifier { Min = min, Max = null };
+        var max = UInt32.Parse(parts[1]);
+        return new Quantifier { Min = min, Max = max };
     }
 
     static Class BuildClass(String text, Quantifier quantifier)
@@ -190,6 +207,18 @@ public static class SfGrammarBuilder
                     astClass.Ranges.Add(new RegexCharacterRange { Pattern = $"\\{next}" });
                     i += 2;
                     continue;
+                }
+
+                if (next == 'p' && i + 2 < text.Length && text[i + 2] == '{')
+                {
+                    var closeBrace = text.IndexOf('}', i + 3);
+                    if (closeBrace >= 0)
+                    {
+                        var property = text[(i + 3)..closeBrace];
+                        astClass.Ranges.Add(new RegexCharacterRange { Pattern = $"\\p{{{property}}}" });
+                        i = closeBrace + 1;
+                        continue;
+                    }
                 }
 
                 var escaped = UnescapeChar(text[i + 1]);
@@ -254,8 +283,34 @@ public static class SfGrammarBuilder
         {
             if (text[i] == '\\' && i + 1 < text.Length)
             {
-                sb.Append(UnescapeChar(text[i + 1]));
-                i++;
+                var next = text[i + 1];
+                if (next == 'u' && i + 5 < text.Length)
+                {
+                    var hex = text.Substring(i + 2, 4);
+                    sb.Append((Char)Convert.ToInt32(hex, 16));
+                    i += 5;
+                }
+                else if (next == 'U' && i + 9 < text.Length)
+                {
+                    var hex = text.Substring(i + 2, 8);
+                    sb.Append(Char.ConvertFromUtf32(Convert.ToInt32(hex, 16)));
+                    i += 9;
+                }
+                else if (next == 'x' && i + 2 < text.Length && text[i + 2] == '{')
+                {
+                    var closeBrace = text.IndexOf('}', i + 3);
+                    if (closeBrace >= 0)
+                    {
+                        var hex = text[(i + 3)..closeBrace];
+                        sb.Append(Char.ConvertFromUtf32(Convert.ToInt32(hex, 16)));
+                        i = closeBrace;
+                    }
+                }
+                else
+                {
+                    sb.Append(UnescapeChar(next));
+                    i++;
+                }
             }
             else
             {
