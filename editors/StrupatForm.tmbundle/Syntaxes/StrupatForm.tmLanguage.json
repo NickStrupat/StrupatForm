@@ -10,7 +10,7 @@
     ],
     "repository": {
         "rule-definition-inline": {
-            "match": "^([A-Za-z_]\\w*)(\\s+->\\s+)(.*)",
+            "match": "^([\\p{L}][\\p{L}\\p{Nd}]*)( -> )(.*)",
             "captures": {
                 "1": { "name": "entity.name.type.rule.sf" },
                 "2": { "name": "keyword.operator.arrow.sf" },
@@ -18,7 +18,7 @@
             }
         },
         "rule-definition-heading": {
-            "match": "^([A-Za-z_]\\w*)\\s*$",
+            "match": "^([\\p{L}][\\p{L}\\p{Nd}]*)\\s*$",
             "captures": {
                 "1": { "name": "entity.name.type.rule.sf" }
             }
@@ -97,7 +97,7 @@
             ]
         },
         "brace-quantifier": {
-            "match": "\\{\\d+(?:,\\d*)?\\}",
+            "match": "\\{\\p{Nd}+(?:,\\p{Nd}*)?\\}",
             "name": "keyword.operator.quantifier.sf"
         },
         "quantifier": {
@@ -112,7 +112,7 @@
             "patterns": [{ "include": "#alternative" }]
         },
         "rule-reference": {
-            "match": "[A-Za-z_]\\w*",
+            "match": "[\\p{L}][\\p{L}\\p{Nd}]*",
             "name": "variable.other.rule-reference.sf"
         }
     }

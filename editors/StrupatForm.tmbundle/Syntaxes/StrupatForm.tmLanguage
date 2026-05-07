@@ -30,7 +30,7 @@
         <key>rule-definition-inline</key>
         <dict>
             <key>match</key>
-            <string>^([A-Za-z_]\w*)(\s+-&gt;\s+)(.*)</string>
+            <string>^([\p{L}][\p{L}\p{Nd}]*)( -&gt; )(.*)</string>
             <key>captures</key>
             <dict>
                 <key>1</key>
@@ -58,7 +58,7 @@
         <key>rule-definition-heading</key>
         <dict>
             <key>match</key>
-            <string>^([A-Za-z_]\w*)\s*$</string>
+            <string>^([\p{L}][\p{L}\p{Nd}]*)\s*$</string>
             <key>captures</key>
             <dict>
                 <key>1</key>
@@ -240,7 +240,7 @@
         <key>brace-quantifier</key>
         <dict>
             <key>match</key>
-            <string>\{\d+(?:,\d*)?\}</string>
+            <string>\{\p{Nd}+(?:,\p{Nd}*)?\}</string>
             <key>name</key>
             <string>keyword.operator.quantifier.sf</string>
         </dict>
@@ -284,7 +284,7 @@
         <key>rule-reference</key>
         <dict>
             <key>match</key>
-            <string>[A-Za-z_]\w*</string>
+            <string>[\p{L}][\p{L}\p{Nd}]*</string>
             <key>name</key>
             <string>variable.other.rule-reference.sf</string>
         </dict>
