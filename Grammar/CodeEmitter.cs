@@ -336,7 +336,7 @@ public static class CodeEmitter
             w.PopIndent();
             w.Line("}");
         }
-        w.Line("throw new ParseException(new ParseError());");
+        w.Line("Length = -1;");
         w.PopIndent();
         w.Line("}");
         w.Blank();
@@ -362,20 +362,22 @@ public static class CodeEmitter
         w.Line("{");
         w.PushIndent();
         w.Lines($$"""
+            private readonly Input input;
             private readonly Input parentInput;
             private readonly Byte parentKind;
 
             public {{rule.Name}}({{ConstructorParams()}})
             {
+                this.input = input;
                 this.parentInput = parentInput;
                 this.parentKind = parentKind;
                 if (input.Length < {{literal.Length}} || input[..{{literal.Length}}] is not "{{escaped}}")
-                    throw new ParseException(new ParseError());
-                Text = input[..{{literal.Length}}];
+                    { Length = -1; return; }
+                Length = {{literal.Length}};
             }
 
-            public Input Text { get; }
-            public Int32 Length => {{literal.Length}};
+            public Input Text => input[..Length];
+            public Int32 Length { get; }
 
             public void VisitChildren<T>(ref T visitor) where T : {{ns}}.IVisitor, allows ref struct { }
             """);
@@ -515,7 +517,7 @@ public static class CodeEmitter
                 {
                     w.Line($"if (i >= input.Length || input[i] != '{EscapeChar(ls.Value[0])}')");
                     w.PushIndent();
-                    w.Line("throw new ParseException(new ParseError());");
+                    w.Line("{ Length = -1; return; }");
                     w.PopIndent();
                     w.Line("i++;");
                 }
@@ -523,7 +525,7 @@ public static class CodeEmitter
                 {
                     w.Line($"if (!input[i..].StartsWith(\"{EscapeString(ls.Value)}\"))");
                     w.PushIndent();
-                    w.Line("throw new ParseException(new ParseError());");
+                    w.Line("{ Length = -1; return; }");
                     w.PopIndent();
                     w.Line($"i += {ls.Value.Length};");
                 }
@@ -536,7 +538,7 @@ public static class CodeEmitter
                 {
                     w.Line($"if (i >= input.Length || !{helperName}(input[i]))");
                     w.PushIndent();
-                    w.Line("throw new ParseException(new ParseError());");
+                    w.Line("{ Length = -1; return; }");
                     w.PopIndent();
                     w.Line("i++;");
                 }
@@ -544,7 +546,7 @@ public static class CodeEmitter
                 {
                     w.Line($"if (i >= input.Length || !{helperName}(input[i]))");
                     w.PushIndent();
-                    w.Line("throw new ParseException(new ParseError());");
+                    w.Line("{ Length = -1; return; }");
                     w.PopIndent();
                     w.Line("i++;");
                     w.Line($"while (i < input.Length && {helperName}(input[i]))");
@@ -578,12 +580,15 @@ public static class CodeEmitter
         w.Line($"var end = input[1..].IndexOf('{EscapeChar(delim)}');");
         w.Line("if (end < 0)");
         w.PushIndent();
-        w.Line("throw new ParseException(new ParseError());");
+        w.Line("{ Length = -1; return; }");
         w.PopIndent();
         w.Line("Length = end + 2;");
     }
 
-    static void EmitSingleItemTerminal(Item item, EmitContext ctx)
+    static void EmitSingleItemTerminal(Item item, EmitContext ctx) =>
+        EmitSingleItemTerminalWithFailAction(item, "{ Length = -1; return; }", ctx);
+
+    static void EmitSingleItemTerminalWithFailAction(Item item, String failAction, EmitContext ctx)
     {
         var w = ctx.W;
         if (item is Literal<String> ls)
@@ -592,7 +597,7 @@ public static class CodeEmitter
             {
                 w.Line($"if (input.Length == 0 || input[0] != '{EscapeChar(ls.Value[0])}')");
                 w.PushIndent();
-                w.Line("throw new ParseException(new ParseError());");
+                w.Line(failAction);
                 w.PopIndent();
                 w.Line("Length = 1;");
             }
@@ -600,7 +605,7 @@ public static class CodeEmitter
             {
                 w.Line($"if (!input.StartsWith(\"{EscapeString(ls.Value)}\"))");
                 w.PushIndent();
-                w.Line("throw new ParseException(new ParseError());");
+                w.Line(failAction);
                 w.PopIndent();
                 w.Line($"Length = {ls.Value.Length};");
             }
@@ -613,7 +618,7 @@ public static class CodeEmitter
             {
                 w.Line($"if (input.Length == 0 || !{helperName}(input[0]))");
                 w.PushIndent();
-                w.Line("throw new ParseException(new ParseError());");
+                w.Line(failAction);
                 w.PopIndent();
                 w.Line("Length = 1;");
             }
@@ -621,7 +626,7 @@ public static class CodeEmitter
             {
                 w.Line($"if (input.Length == 0 || !{helperName}(input[0]))");
                 w.PushIndent();
-                w.Line("throw new ParseException(new ParseError());");
+                w.Line(failAction);
                 w.PopIndent();
                 w.Line("var i = 1;");
                 w.Line($"while (i < input.Length && {helperName}(input[i]))");
@@ -849,13 +854,8 @@ public static class CodeEmitter
             {
                 if (rr.Quantifier is { Min: 0, Max: 1 })
                 {
-                    w.Line("try");
-                    w.Line("{");
-                    w.PushIndent();
-                    w.Line($"visitor.Visit(new {rr.Name}(input[{CamelCase(name)}Start..], input, {ruleId}));");
-                    w.PopIndent();
-                    w.Line("}");
-                    w.Line("catch (ParseException) { }");
+                    w.Line($"var {CamelCase(name)}Opt = new {rr.Name}(input[{CamelCase(name)}Start..], input, {ruleId});");
+                    w.Line($"if ({CamelCase(name)}Opt.Length >= 0) visitor.Visit({CamelCase(name)}Opt);");
                 }
                 else
                 {
@@ -903,7 +903,7 @@ public static class CodeEmitter
                 {
                     w.Line($"if (pos >= input.Length || input[pos] != '{EscapeChar(lc.Value[0])}')");
                     w.PushIndent();
-                    w.Line("throw new ParseException(new ParseError());");
+                    w.Line("{ Length = -1; return; }");
                     w.PopIndent();
                     w.Line("pos += 1;");
                 }
@@ -913,7 +913,7 @@ public static class CodeEmitter
             {
                 w.Line($"if (!input[pos..].StartsWith(\"{EscapeString(ls.Value)}\"))");
                 w.PushIndent();
-                w.Line("throw new ParseException(new ParseError());");
+                w.Line("{ Length = -1; return; }");
                 w.PopIndent();
                 w.Line($"pos += {ls.Value.Length};");
                 if (!isLast) EmitSkipWs(ctx);
@@ -925,6 +925,7 @@ public static class CodeEmitter
                     var name = propertyNames[ntIndex];
                     w.Line($"{CamelCase(name)}Start = pos;");
                     w.Line($"var {CamelCase(name)} = new {rr.Name}(input[pos..]);");
+                    w.Line($"if ({CamelCase(name)}.Length < 0) {{ Length = -1; return; }}");
                     w.Line($"pos += {CamelCase(name)}.Length;");
                     if (!isLast) EmitSkipWs(ctx);
                     ntIndex++;
@@ -933,14 +934,8 @@ public static class CodeEmitter
                 {
                     var name = propertyNames[ntIndex];
                     w.Line($"{CamelCase(name)}Start = pos;");
-                    w.Line("try");
-                    w.Line("{");
-                    w.PushIndent();
                     w.Line($"var {CamelCase(name)} = new {rr.Name}(input[pos..]);");
-                    w.Line($"pos += {CamelCase(name)}.Length;");
-                    w.PopIndent();
-                    w.Line("}");
-                    w.Line("catch (ParseException) { }");
+                    w.Line($"if ({CamelCase(name)}.Length >= 0) pos += {CamelCase(name)}.Length;");
                     if (!isLast) EmitSkipWs(ctx);
                     ntIndex++;
                 }
@@ -949,24 +944,15 @@ public static class CodeEmitter
                     if (rr.Quantifier.Min >= 1)
                     {
                         w.Line($"var first{rr.Name} = new {rr.Name}(input[pos..]);");
+                        w.Line($"if (first{rr.Name}.Length < 0) {{ Length = -1; return; }}");
                         w.Line($"pos += first{rr.Name}.Length;");
                     }
                     w.Line("while (true)");
                     w.Line("{");
                     w.PushIndent();
-                    w.Line("try");
-                    w.Line("{");
-                    w.PushIndent();
                     w.Line($"var next{rr.Name} = new {rr.Name}(input[pos..]);");
+                    w.Line($"if (next{rr.Name}.Length < 0) break;");
                     w.Line($"pos += next{rr.Name}.Length;");
-                    w.PopIndent();
-                    w.Line("}");
-                    w.Line("catch (ParseException)");
-                    w.Line("{");
-                    w.PushIndent();
-                    w.Line("break;");
-                    w.PopIndent();
-                    w.Line("}");
                     w.PopIndent();
                     w.Line("}");
                     if (!isLast) EmitSkipWs(ctx);
@@ -1015,20 +1001,10 @@ public static class CodeEmitter
                 w.Line("while (pos < Length)");
                 w.Line("{");
                 w.PushIndent();
-                w.Line("try");
-                w.Line("{");
-                w.PushIndent();
                 w.Line($"var next{qrr.Name} = new {qrr.Name}(input[pos..], input, {ruleId});");
+                w.Line($"if (next{qrr.Name}.Length < 0) break;");
                 w.Line($"visitor.Visit(next{qrr.Name});");
                 w.Line($"pos += next{qrr.Name}.Length;");
-                w.PopIndent();
-                w.Line("}");
-                w.Line("catch (ParseException)");
-                w.Line("{");
-                w.PushIndent();
-                w.Line("break;");
-                w.PopIndent();
-                w.Line("}");
                 w.PopIndent();
                 w.Line("}");
             }
@@ -1042,22 +1018,21 @@ public static class CodeEmitter
                 w.Line("while (pos < Length)");
                 w.Line("{");
                 w.PushIndent();
-                w.Line("try");
-                w.Line("{");
-                w.PushIndent();
+                w.Line("var savedPos = pos;");
                 EmitSkipWs(ctx);
                 foreach (var subItem in subAlt.Items)
                 {
                     if (subItem is RuleRef subRr)
                     {
                         w.Line($"var next{subRr.Name} = new {subRr.Name}(input[pos..], input, {ruleId});");
+                        w.Line($"if (next{subRr.Name}.Length < 0) {{ pos = savedPos; break; }}");
                         w.Line($"visitor.Visit(next{subRr.Name});");
                         w.Line($"pos += next{subRr.Name}.Length;");
                         EmitSkipWs(ctx);
                     }
                     else if (subItem is Literal<String> { Value.Length: 1 } subLc)
                     {
-                        w.Line($"if (pos >= input.Length || input[pos] != '{EscapeChar(subLc.Value[0])}') break;");
+                        w.Line($"if (pos >= input.Length || input[pos] != '{EscapeChar(subLc.Value[0])}') {{ pos = savedPos; break; }}");
                         w.Line("pos += 1;");
                         if (subLc.Quantifier is { Max: null })
                         {
@@ -1069,13 +1044,10 @@ public static class CodeEmitter
                     }
                     else if (subItem is Literal<String> subLs)
                     {
-                        w.Line($"if (!input[pos..].StartsWith(\"{EscapeString(subLs.Value)}\")) break;");
+                        w.Line($"if (!input[pos..].StartsWith(\"{EscapeString(subLs.Value)}\")) {{ pos = savedPos; break; }}");
                         w.Line($"pos += {subLs.Value.Length};");
                     }
                 }
-                w.PopIndent();
-                w.Line("}");
-                w.Line("catch (ParseException) { break; }");
                 w.PopIndent();
                 w.Line("}");
             }
@@ -1094,6 +1066,7 @@ public static class CodeEmitter
             w.PushIndent();
             w.Line("pos += 1;");
             w.Line($"var next = new {singleRr.Name}(input[pos..]);");
+            w.Line("if (next.Length < 0) break;");
             w.Line("pos += next.Length;");
             w.PopIndent();
             w.Line("}");
@@ -1104,9 +1077,6 @@ public static class CodeEmitter
         w.Line("{");
         w.PushIndent();
         w.Line("var savedPos = pos;");
-        w.Line("try");
-        w.Line("{");
-        w.PushIndent();
         EmitSkipWs(ctx);
         foreach (var item in items)
         {
@@ -1114,6 +1084,7 @@ public static class CodeEmitter
             {
                 var varName = $"next{rr.Name}";
                 w.Line($"var {varName} = new {rr.Name}(input[pos..]);");
+                w.Line($"if ({varName}.Length < 0) {{ pos = savedPos; break; }}");
                 w.Line($"pos += {varName}.Length;");
                 EmitSkipWs(ctx);
             }
@@ -1121,7 +1092,7 @@ public static class CodeEmitter
             {
                 w.Line($"if (!input[pos..].StartsWith(\"{EscapeString(ls.Value)}\"))");
                 w.PushIndent();
-                w.Line("throw new ParseException(new ParseError());");
+                w.Line("{ pos = savedPos; break; }");
                 w.PopIndent();
                 w.Line($"pos += {ls.Value.Length};");
                 EmitSkipWs(ctx);
@@ -1131,7 +1102,7 @@ public static class CodeEmitter
                 var q = litC.Quantifier;
                 w.Line($"if (pos >= input.Length || input[pos] != '{EscapeChar(litC.Value[0])}')");
                 w.PushIndent();
-                w.Line("throw new ParseException(new ParseError());");
+                w.Line("{ pos = savedPos; break; }");
                 w.PopIndent();
                 w.Line("pos += 1;");
                 if (q is { Max: null })
@@ -1144,15 +1115,6 @@ public static class CodeEmitter
                 EmitSkipWs(ctx);
             }
         }
-        w.PopIndent();
-        w.Line("}");
-        w.Line("catch (ParseException)");
-        w.Line("{");
-        w.PushIndent();
-        w.Line("pos = savedPos;");
-        w.Line("break;");
-        w.PopIndent();
-        w.Line("}");
         w.PopIndent();
         w.Line("}");
     }
@@ -1190,27 +1152,19 @@ public static class CodeEmitter
 
             if (!isLast)
             {
-                w.Line("try");
+                w.Line("do");
                 w.Line("{");
                 w.PushIndent();
             }
 
-            EmitMixedAlternativeBody(alt, i + 1, ctx);
+            EmitMixedAlternativeBody(alt, i + 1, ctx, breakOnFailure: !isLast);
 
             if (!isLast)
             {
                 w.PopIndent();
-                w.Line("}");
-                w.Line("catch (ParseException)");
-                w.Line("{");
-                w.PushIndent();
+                w.Line("} while (false);");
+                w.Line("if (Length >= 0) return;");
             }
-        }
-
-        for (var i = 0; i < rule.Alternatives.Count - 1; i++)
-        {
-            w.PopIndent();
-            w.Line("}");
         }
 
         w.PopIndent();
@@ -1229,14 +1183,15 @@ public static class CodeEmitter
         w.Line("}");
     }
 
-    static void EmitMixedAlternativeBody(Alternative alt, Int32 index, EmitContext ctx)
+    static void EmitMixedAlternativeBody(Alternative alt, Int32 index, EmitContext ctx, Boolean breakOnFailure = false)
     {
         var w = ctx.W;
         var items = alt.Items;
+        var failAction = breakOnFailure ? "{ Length = -1; break; }" : "{ Length = -1; return; }";
 
         if (items.Count == 1 && items[0] is not RuleRef)
         {
-            EmitSingleItemTerminal(items[0], ctx);
+            EmitSingleItemTerminalWithFailAction(items[0], failAction, ctx);
             w.Line($"index = {index};");
             return;
         }
@@ -1251,7 +1206,7 @@ public static class CodeEmitter
                 {
                     w.Line($"if (pos >= input.Length || input[pos] != '{EscapeChar(ls.Value[0])}')");
                     w.PushIndent();
-                    w.Line("throw new ParseException(new ParseError());");
+                    w.Line(failAction);
                     w.PopIndent();
                     w.Line("pos += 1;");
                 }
@@ -1259,7 +1214,7 @@ public static class CodeEmitter
                 {
                     w.Line($"if (!input[pos..].StartsWith(\"{EscapeString(ls.Value)}\"))");
                     w.PushIndent();
-                    w.Line("throw new ParseException(new ParseError());");
+                    w.Line(failAction);
                     w.PopIndent();
                     w.Line($"pos += {ls.Value.Length};");
                 }
@@ -1273,37 +1228,28 @@ public static class CodeEmitter
                 if (q is { Min: 1, Max: 1 })
                 {
                     w.Line($"var {varName} = new {rr.Name}(input[pos..]);");
+                    w.Line($"if ({varName}.Length < 0) {failAction}");
                     w.Line($"pos += {varName}.Length;");
                 }
                 else if (q is { Min: 0, Max: 1 })
                 {
-                    w.Line("try");
-                    w.Line("{");
-                    w.PushIndent();
                     w.Line($"var {varName} = new {rr.Name}(input[pos..]);");
-                    w.Line($"pos += {varName}.Length;");
-                    w.PopIndent();
-                    w.Line("}");
-                    w.Line("catch (ParseException) { }");
+                    w.Line($"if ({varName}.Length >= 0) pos += {varName}.Length;");
                 }
                 else if (q.Max == null)
                 {
                     if (q.Min >= 1)
                     {
                         w.Line($"var first{rr.Name} = new {rr.Name}(input[pos..]);");
+                        w.Line($"if (first{rr.Name}.Length < 0) {failAction}");
                         w.Line($"pos += first{rr.Name}.Length;");
                     }
                     w.Line("while (true)");
                     w.Line("{");
                     w.PushIndent();
-                    w.Line("try");
-                    w.Line("{");
-                    w.PushIndent();
                     w.Line($"var next{rr.Name} = new {rr.Name}(input[pos..]);");
+                    w.Line($"if (next{rr.Name}.Length < 0) break;");
                     w.Line($"pos += next{rr.Name}.Length;");
-                    w.PopIndent();
-                    w.Line("}");
-                    w.Line("catch (ParseException) { break; }");
                     w.PopIndent();
                     w.Line("}");
                 }
@@ -1316,7 +1262,7 @@ public static class CodeEmitter
                 {
                     w.Line($"if (pos >= input.Length || !{helperName}(input[pos]))");
                     w.PushIndent();
-                    w.Line("throw new ParseException(new ParseError());");
+                    w.Line(failAction);
                     w.PopIndent();
                     w.Line("pos += 1;");
                 }
@@ -1324,7 +1270,7 @@ public static class CodeEmitter
                 {
                     w.Line($"if (pos >= input.Length || !{helperName}(input[pos]))");
                     w.PushIndent();
-                    w.Line("throw new ParseException(new ParseError());");
+                    w.Line(failAction);
                     w.PopIndent();
                     w.Line("pos += 1;");
                     w.Line($"while (pos < input.Length && {helperName}(input[pos]))");
@@ -1552,31 +1498,18 @@ public static class CodeEmitter
         w.Line("}");
     }
 
-    static void EmitAmbiguousTryCatchChain(List<(RuleRef rr, Int32 index)> ambiguous, Int32 pos, EmitContext ctx)
+    static void EmitAmbiguousTryCatchChain(List<(RuleRef rr, Int32 index)> ambiguous, Int32 startPos, EmitContext ctx)
     {
         var w = ctx.W;
-        if (pos == ambiguous.Count - 1)
+        for (var pos = startPos; pos < ambiguous.Count; pos++)
         {
             var (rr, index) = ambiguous[pos];
-            EmitAlternativeConstruction(rr, index, ctx);
-            return;
+            var isLast = pos == ambiguous.Count - 1;
+            EmitAlternativeConstruction(rr, index, ctx, checkLength: !isLast);
         }
-        var (currRr, currIndex) = ambiguous[pos];
-        w.Line("try");
-        w.Line("{");
-        w.PushIndent();
-        EmitAlternativeConstruction(currRr, currIndex, ctx);
-        w.PopIndent();
-        w.Line("}");
-        w.Line("catch (ParseException)");
-        w.Line("{");
-        w.PushIndent();
-        EmitAmbiguousTryCatchChain(ambiguous, pos + 1, ctx);
-        w.PopIndent();
-        w.Line("}");
     }
 
-    static void EmitAlternativeConstruction(RuleRef rr, Int32 index, EmitContext ctx)
+    static void EmitAlternativeConstruction(RuleRef rr, Int32 index, EmitContext ctx, Boolean checkLength = false)
     {
         var w = ctx.W;
         var q = rr.Quantifier;
@@ -1586,33 +1519,26 @@ public static class CodeEmitter
             w.Line($"var {CamelCase(rr.Name)} = new {rr.Name}(input);");
             w.Line($"index = {index};");
             w.Line($"Length = {CamelCase(rr.Name)}.Length;");
+            if (checkLength) w.Line("if (Length >= 0) return;");
         }
         else if (q.Max == null)
         {
             w.Line($"var first = new {rr.Name}(input);");
+            w.Line($"if (first.Length < 0) {{ Length = -1; {(checkLength ? "return;" : "return;")} }}");
             w.Line("var pos = first.Length;");
             EmitSkipWs(ctx);
             w.Line("while (pos < input.Length)");
             w.Line("{");
             w.PushIndent();
-            w.Line("try");
-            w.Line("{");
-            w.PushIndent();
             w.Line($"var next = new {rr.Name}(input[pos..]);");
+            w.Line("if (next.Length < 0) break;");
             w.Line("pos += next.Length;");
             EmitSkipWs(ctx);
             w.PopIndent();
             w.Line("}");
-            w.Line("catch (ParseException)");
-            w.Line("{");
-            w.PushIndent();
-            w.Line("break;");
-            w.PopIndent();
-            w.Line("}");
-            w.PopIndent();
-            w.Line("}");
             w.Line($"index = {index};");
             w.Line("Length = pos;");
+            if (checkLength) w.Line("if (Length >= 0) return;");
         }
     }
 
@@ -1746,16 +1672,11 @@ public static class CodeEmitter
                         var remaining = input[consumed..];{{wsSetup}}
                         if (remaining.IsEmpty)
                             return false;
-                        try
-                        {
-                            Current = new {{name}}(remaining);
-                            consumed += {{consumedExpr}};
-                            return true;
-                        }
-                        catch (ParseException)
-                        {
+                        Current = new {{name}}(remaining);
+                        if (Current.Length < 0)
                             return false;
-                        }
+                        consumed += {{consumedExpr}};
+                        return true;
                     }
             """);
         w.PushIndent(); w.PushIndent();

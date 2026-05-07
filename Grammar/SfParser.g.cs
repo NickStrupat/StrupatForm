@@ -36,7 +36,7 @@ public readonly ref struct Letter : IRule
         this.parentInput = parentInput;
         this.parentKind = parentKind;
         if (input.Length == 0 || !IsAlphaChar(input[0]))
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         Length = 1;
     }
 
@@ -67,7 +67,7 @@ public readonly ref struct OtherLetter : IRule
         this.parentInput = parentInput;
         this.parentKind = parentKind;
         if (input.Length == 0 || !IsGeneralCategoryOtherLetterChar(input[0]))
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         Length = 1;
     }
 
@@ -100,18 +100,13 @@ public readonly ref struct NameStart : IRule
         this.input = input;
         this.parentInput = parentInput;
         this.parentKind = parentKind;
-        try
-        {
-            var letter = new Letter(input);
-            index = 1;
-            Length = letter.Length;
-        }
-        catch (ParseException)
-        {
-            var otherLetter = new OtherLetter(input);
-            index = 2;
-            Length = otherLetter.Length;
-        }
+        var letter = new Letter(input);
+        index = 1;
+        Length = letter.Length;
+        if (Length >= 0) return;
+        var otherLetter = new OtherLetter(input);
+        index = 2;
+        Length = otherLetter.Length;
     }
 
     public Input Text => input[..Length];
@@ -164,7 +159,7 @@ public readonly ref struct Number : IRule
         this.parentInput = parentInput;
         this.parentKind = parentKind;
         if (input.Length == 0 || !IsDecimalNumberChar(input[0]))
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         var i = 1;
         while (i < input.Length && IsDecimalNumberChar(input[i]))
             i++;
@@ -201,27 +196,17 @@ public readonly ref struct NameContinue : IRule
         this.input = input;
         this.parentInput = parentInput;
         this.parentKind = parentKind;
-        try
-        {
-            var letter = new Letter(input);
-            index = 1;
-            Length = letter.Length;
-        }
-        catch (ParseException)
-        {
-            try
-            {
-                var otherLetter = new OtherLetter(input);
-                index = 2;
-                Length = otherLetter.Length;
-            }
-            catch (ParseException)
-            {
-                var number = new Number(input);
-                index = 3;
-                Length = number.Length;
-            }
-        }
+        var letter = new Letter(input);
+        index = 1;
+        Length = letter.Length;
+        if (Length >= 0) return;
+        var otherLetter = new OtherLetter(input);
+        index = 2;
+        Length = otherLetter.Length;
+        if (Length >= 0) return;
+        var number = new Number(input);
+        index = 3;
+        Length = number.Length;
     }
 
     public Input Text => input[..Length];
@@ -280,18 +265,13 @@ public readonly ref struct Name : IRule
         var pos = 0;
         nameStartStart = pos;
         var nameStart = new NameStart(input[pos..]);
+        if (nameStart.Length < 0) { Length = -1; return; }
         pos += nameStart.Length;
         while (true)
         {
-            try
-            {
-                var nextNameContinue = new NameContinue(input[pos..]);
-                pos += nextNameContinue.Length;
-            }
-            catch (ParseException)
-            {
-                break;
-            }
+            var nextNameContinue = new NameContinue(input[pos..]);
+            if (nextNameContinue.Length < 0) break;
+            pos += nextNameContinue.Length;
         }
         Length = pos;
     }
@@ -306,16 +286,10 @@ public readonly ref struct Name : IRule
         var pos = nameStartStart + nameStart.Length;
         while (pos < Length)
         {
-            try
-            {
-                var nextNameContinue = new NameContinue(input[pos..], input, 6);
-                visitor.Visit(nextNameContinue);
-                pos += nextNameContinue.Length;
-            }
-            catch (ParseException)
-            {
-                break;
-            }
+            var nextNameContinue = new NameContinue(input[pos..], input, 6);
+            if (nextNameContinue.Length < 0) break;
+            visitor.Visit(nextNameContinue);
+            pos += nextNameContinue.Length;
         }
     }
 
@@ -342,13 +316,14 @@ public readonly ref struct Group : IRule
         this.parentKind = parentKind;
         var pos = 0;
         if (pos >= input.Length || input[pos] != '(')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         alternativeStart = pos;
         var alternative = new Alternative(input[pos..]);
+        if (alternative.Length < 0) { Length = -1; return; }
         pos += alternative.Length;
         if (pos >= input.Length || input[pos] != ')')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         Length = pos;
     }
@@ -385,6 +360,7 @@ public readonly ref struct RuleRef : IRule
         var pos = 0;
         nameStart = pos;
         var name = new Name(input[pos..]);
+        if (name.Length < 0) { Length = -1; return; }
         pos += name.Length;
         Length = pos;
     }
@@ -418,10 +394,10 @@ public readonly ref struct EscapedChar : IRule
         this.parentKind = parentKind;
         var i = 0;
         if (i >= input.Length || input[i] != '\\')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         i++;
         if (i >= input.Length || !Is05CTNR2227Char(input[i]))
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         i++;
         Length = i;
     }
@@ -453,7 +429,7 @@ public readonly ref struct Hexadec : IRule
         this.parentInput = parentInput;
         this.parentKind = parentKind;
         if (input.Length == 0 || !Is0To9AToFAToFChar(input[0]))
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         Length = 1;
     }
 
@@ -493,68 +469,41 @@ public readonly ref struct HexEscape : IRule
         this.parentKind = parentKind;
         var pos = 0;
         if (pos >= input.Length || input[pos] != '\\')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         if (pos >= input.Length || input[pos] != 'x')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         if (pos >= input.Length || input[pos] != '{')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         leftStart = pos;
         var left = new Hexadec(input[pos..]);
+        if (left.Length < 0) { Length = -1; return; }
         pos += left.Length;
         rightStart = pos;
-        try
-        {
-            var right = new Hexadec(input[pos..]);
-            pos += right.Length;
-        }
-        catch (ParseException) { }
+        var right = new Hexadec(input[pos..]);
+        if (right.Length >= 0) pos += right.Length;
         hexadec3Start = pos;
-        try
-        {
-            var hexadec3 = new Hexadec(input[pos..]);
-            pos += hexadec3.Length;
-        }
-        catch (ParseException) { }
+        var hexadec3 = new Hexadec(input[pos..]);
+        if (hexadec3.Length >= 0) pos += hexadec3.Length;
         hexadec4Start = pos;
-        try
-        {
-            var hexadec4 = new Hexadec(input[pos..]);
-            pos += hexadec4.Length;
-        }
-        catch (ParseException) { }
+        var hexadec4 = new Hexadec(input[pos..]);
+        if (hexadec4.Length >= 0) pos += hexadec4.Length;
         hexadec5Start = pos;
-        try
-        {
-            var hexadec5 = new Hexadec(input[pos..]);
-            pos += hexadec5.Length;
-        }
-        catch (ParseException) { }
+        var hexadec5 = new Hexadec(input[pos..]);
+        if (hexadec5.Length >= 0) pos += hexadec5.Length;
         hexadec6Start = pos;
-        try
-        {
-            var hexadec6 = new Hexadec(input[pos..]);
-            pos += hexadec6.Length;
-        }
-        catch (ParseException) { }
+        var hexadec6 = new Hexadec(input[pos..]);
+        if (hexadec6.Length >= 0) pos += hexadec6.Length;
         hexadec7Start = pos;
-        try
-        {
-            var hexadec7 = new Hexadec(input[pos..]);
-            pos += hexadec7.Length;
-        }
-        catch (ParseException) { }
+        var hexadec7 = new Hexadec(input[pos..]);
+        if (hexadec7.Length >= 0) pos += hexadec7.Length;
         hexadec8Start = pos;
-        try
-        {
-            var hexadec8 = new Hexadec(input[pos..]);
-            pos += hexadec8.Length;
-        }
-        catch (ParseException) { }
+        var hexadec8 = new Hexadec(input[pos..]);
+        if (hexadec8.Length >= 0) pos += hexadec8.Length;
         if (pos >= input.Length || input[pos] != '}')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         Length = pos;
     }
@@ -572,41 +521,20 @@ public readonly ref struct HexEscape : IRule
     public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
     {
         visitor.Visit(new Hexadec(input[leftStart..], input, 11));
-        try
-        {
-            visitor.Visit(new Hexadec(input[rightStart..], input, 11));
-        }
-        catch (ParseException) { }
-        try
-        {
-            visitor.Visit(new Hexadec(input[hexadec3Start..], input, 11));
-        }
-        catch (ParseException) { }
-        try
-        {
-            visitor.Visit(new Hexadec(input[hexadec4Start..], input, 11));
-        }
-        catch (ParseException) { }
-        try
-        {
-            visitor.Visit(new Hexadec(input[hexadec5Start..], input, 11));
-        }
-        catch (ParseException) { }
-        try
-        {
-            visitor.Visit(new Hexadec(input[hexadec6Start..], input, 11));
-        }
-        catch (ParseException) { }
-        try
-        {
-            visitor.Visit(new Hexadec(input[hexadec7Start..], input, 11));
-        }
-        catch (ParseException) { }
-        try
-        {
-            visitor.Visit(new Hexadec(input[hexadec8Start..], input, 11));
-        }
-        catch (ParseException) { }
+        var rightOpt = new Hexadec(input[rightStart..], input, 11);
+        if (rightOpt.Length >= 0) visitor.Visit(rightOpt);
+        var hexadec3Opt = new Hexadec(input[hexadec3Start..], input, 11);
+        if (hexadec3Opt.Length >= 0) visitor.Visit(hexadec3Opt);
+        var hexadec4Opt = new Hexadec(input[hexadec4Start..], input, 11);
+        if (hexadec4Opt.Length >= 0) visitor.Visit(hexadec4Opt);
+        var hexadec5Opt = new Hexadec(input[hexadec5Start..], input, 11);
+        if (hexadec5Opt.Length >= 0) visitor.Visit(hexadec5Opt);
+        var hexadec6Opt = new Hexadec(input[hexadec6Start..], input, 11);
+        if (hexadec6Opt.Length >= 0) visitor.Visit(hexadec6Opt);
+        var hexadec7Opt = new Hexadec(input[hexadec7Start..], input, 11);
+        if (hexadec7Opt.Length >= 0) visitor.Visit(hexadec7Opt);
+        var hexadec8Opt = new Hexadec(input[hexadec8Start..], input, 11);
+        if (hexadec8Opt.Length >= 0) visitor.Visit(hexadec8Opt);
     }
 
     public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
@@ -635,22 +563,26 @@ public readonly ref struct Unicode4Escape : IRule
         this.parentKind = parentKind;
         var pos = 0;
         if (pos >= input.Length || input[pos] != '\\')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         if (pos >= input.Length || input[pos] != 'u')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         leftStart = pos;
         var left = new Hexadec(input[pos..]);
+        if (left.Length < 0) { Length = -1; return; }
         pos += left.Length;
         rightStart = pos;
         var right = new Hexadec(input[pos..]);
+        if (right.Length < 0) { Length = -1; return; }
         pos += right.Length;
         hexadec3Start = pos;
         var hexadec3 = new Hexadec(input[pos..]);
+        if (hexadec3.Length < 0) { Length = -1; return; }
         pos += hexadec3.Length;
         hexadec4Start = pos;
         var hexadec4 = new Hexadec(input[pos..]);
+        if (hexadec4.Length < 0) { Length = -1; return; }
         pos += hexadec4.Length;
         Length = pos;
     }
@@ -699,34 +631,42 @@ public readonly ref struct Unicode8Escape : IRule
         this.parentKind = parentKind;
         var pos = 0;
         if (pos >= input.Length || input[pos] != '\\')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         if (pos >= input.Length || input[pos] != 'U')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         leftStart = pos;
         var left = new Hexadec(input[pos..]);
+        if (left.Length < 0) { Length = -1; return; }
         pos += left.Length;
         rightStart = pos;
         var right = new Hexadec(input[pos..]);
+        if (right.Length < 0) { Length = -1; return; }
         pos += right.Length;
         hexadec3Start = pos;
         var hexadec3 = new Hexadec(input[pos..]);
+        if (hexadec3.Length < 0) { Length = -1; return; }
         pos += hexadec3.Length;
         hexadec4Start = pos;
         var hexadec4 = new Hexadec(input[pos..]);
+        if (hexadec4.Length < 0) { Length = -1; return; }
         pos += hexadec4.Length;
         hexadec5Start = pos;
         var hexadec5 = new Hexadec(input[pos..]);
+        if (hexadec5.Length < 0) { Length = -1; return; }
         pos += hexadec5.Length;
         hexadec6Start = pos;
         var hexadec6 = new Hexadec(input[pos..]);
+        if (hexadec6.Length < 0) { Length = -1; return; }
         pos += hexadec6.Length;
         hexadec7Start = pos;
         var hexadec7 = new Hexadec(input[pos..]);
+        if (hexadec7.Length < 0) { Length = -1; return; }
         pos += hexadec7.Length;
         hexadec8Start = pos;
         var hexadec8 = new Hexadec(input[pos..]);
+        if (hexadec8.Length < 0) { Length = -1; return; }
         pos += hexadec8.Length;
         Length = pos;
     }
@@ -777,27 +717,17 @@ public readonly ref struct UnicodeEscapeChar : IRule
         this.input = input;
         this.parentInput = parentInput;
         this.parentKind = parentKind;
-        try
-        {
-            var hexEscape = new HexEscape(input);
-            index = 1;
-            Length = hexEscape.Length;
-        }
-        catch (ParseException)
-        {
-            try
-            {
-                var unicode8Escape = new Unicode8Escape(input);
-                index = 3;
-                Length = unicode8Escape.Length;
-            }
-            catch (ParseException)
-            {
-                var unicode4Escape = new Unicode4Escape(input);
-                index = 2;
-                Length = unicode4Escape.Length;
-            }
-        }
+        var hexEscape = new HexEscape(input);
+        index = 1;
+        Length = hexEscape.Length;
+        if (Length >= 0) return;
+        var unicode8Escape = new Unicode8Escape(input);
+        index = 3;
+        Length = unicode8Escape.Length;
+        if (Length >= 0) return;
+        var unicode4Escape = new Unicode4Escape(input);
+        index = 2;
+        Length = unicode4Escape.Length;
     }
 
     public Input Text => input[..Length];
@@ -853,7 +783,7 @@ public readonly ref struct PlainStringChar : IRule
         this.parentInput = parentInput;
         this.parentKind = parentKind;
         if (input.Length == 0 || !IsNot5C22Char(input[0]))
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         Length = 1;
     }
 
@@ -887,27 +817,17 @@ public readonly ref struct StringChar : IRule
         this.input = input;
         this.parentInput = parentInput;
         this.parentKind = parentKind;
-        try
-        {
-            var escapedChar = new EscapedChar(input);
-            index = 1;
-            Length = escapedChar.Length;
-        }
-        catch (ParseException)
-        {
-            try
-            {
-                var unicodeEscapeChar = new UnicodeEscapeChar(input);
-                index = 2;
-                Length = unicodeEscapeChar.Length;
-            }
-            catch (ParseException)
-            {
-                var plainStringChar = new PlainStringChar(input);
-                index = 3;
-                Length = plainStringChar.Length;
-            }
-        }
+        var escapedChar = new EscapedChar(input);
+        index = 1;
+        Length = escapedChar.Length;
+        if (Length >= 0) return;
+        var unicodeEscapeChar = new UnicodeEscapeChar(input);
+        index = 2;
+        Length = unicodeEscapeChar.Length;
+        if (Length >= 0) return;
+        var plainStringChar = new PlainStringChar(input);
+        index = 3;
+        Length = plainStringChar.Length;
     }
 
     public Input Text => input[..Length];
@@ -964,22 +884,16 @@ public readonly ref struct StringLiteral : IRule
         this.parentKind = parentKind;
         var pos = 0;
         if (pos >= input.Length || input[pos] != '\"')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         while (true)
         {
-            try
-            {
-                var nextStringChar = new StringChar(input[pos..]);
-                pos += nextStringChar.Length;
-            }
-            catch (ParseException)
-            {
-                break;
-            }
+            var nextStringChar = new StringChar(input[pos..]);
+            if (nextStringChar.Length < 0) break;
+            pos += nextStringChar.Length;
         }
         if (pos >= input.Length || input[pos] != '\"')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         Length = pos;
     }
@@ -991,16 +905,10 @@ public readonly ref struct StringLiteral : IRule
         var pos = 0;
         while (pos < Length)
         {
-            try
-            {
-                var nextStringChar = new StringChar(input[pos..], input, 17);
-                visitor.Visit(nextStringChar);
-                pos += nextStringChar.Length;
-            }
-            catch (ParseException)
-            {
-                break;
-            }
+            var nextStringChar = new StringChar(input[pos..], input, 17);
+            if (nextStringChar.Length < 0) break;
+            visitor.Visit(nextStringChar);
+            pos += nextStringChar.Length;
         }
     }
 
@@ -1025,7 +933,7 @@ public readonly ref struct PlainChar : IRule
         this.parentInput = parentInput;
         this.parentKind = parentKind;
         if (input.Length == 0 || !IsNot5C27Char(input[0]))
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         Length = 1;
     }
 
@@ -1059,27 +967,17 @@ public readonly ref struct CharLiteralContent : IRule
         this.input = input;
         this.parentInput = parentInput;
         this.parentKind = parentKind;
-        try
-        {
-            var escapedChar = new EscapedChar(input);
-            index = 1;
-            Length = escapedChar.Length;
-        }
-        catch (ParseException)
-        {
-            try
-            {
-                var unicodeEscapeChar = new UnicodeEscapeChar(input);
-                index = 2;
-                Length = unicodeEscapeChar.Length;
-            }
-            catch (ParseException)
-            {
-                var plainChar = new PlainChar(input);
-                index = 3;
-                Length = plainChar.Length;
-            }
-        }
+        var escapedChar = new EscapedChar(input);
+        index = 1;
+        Length = escapedChar.Length;
+        if (Length >= 0) return;
+        var unicodeEscapeChar = new UnicodeEscapeChar(input);
+        index = 2;
+        Length = unicodeEscapeChar.Length;
+        if (Length >= 0) return;
+        var plainChar = new PlainChar(input);
+        index = 3;
+        Length = plainChar.Length;
     }
 
     public Input Text => input[..Length];
@@ -1137,13 +1035,14 @@ public readonly ref struct CharLiteral : IRule
         this.parentKind = parentKind;
         var pos = 0;
         if (pos >= input.Length || input[pos] != '\'')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         charLiteralContentStart = pos;
         var charLiteralContent = new CharLiteralContent(input[pos..]);
+        if (charLiteralContent.Length < 0) { Length = -1; return; }
         pos += charLiteralContent.Length;
         if (pos >= input.Length || input[pos] != '\'')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         Length = pos;
     }
@@ -1178,10 +1077,10 @@ public readonly ref struct ClassEscapedChar : IRule
         this.parentKind = parentKind;
         var i = 0;
         if (i >= input.Length || input[i] != '\\')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         i++;
         if (i >= input.Length || !IsNot0AChar(input[i]))
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         i++;
         Length = i;
     }
@@ -1213,7 +1112,7 @@ public readonly ref struct ClassLetterOrDigit : IRule
         this.parentInput = parentInput;
         this.parentKind = parentKind;
         if (input.Length == 0 || !IsNot5D5C2DChar(input[0]))
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         Length = 1;
     }
 
@@ -1246,18 +1145,13 @@ public readonly ref struct ClassChar : IRule
         this.input = input;
         this.parentInput = parentInput;
         this.parentKind = parentKind;
-        try
-        {
-            var classEscapedChar = new ClassEscapedChar(input);
-            index = 1;
-            Length = classEscapedChar.Length;
-        }
-        catch (ParseException)
-        {
-            var classLetterOrDigit = new ClassLetterOrDigit(input);
-            index = 2;
-            Length = classLetterOrDigit.Length;
-        }
+        var classEscapedChar = new ClassEscapedChar(input);
+        index = 1;
+        Length = classEscapedChar.Length;
+        if (Length >= 0) return;
+        var classLetterOrDigit = new ClassLetterOrDigit(input);
+        index = 2;
+        Length = classLetterOrDigit.Length;
     }
 
     public Input Text => input[..Length];
@@ -1314,12 +1208,14 @@ public readonly ref struct CharRange : IRule
         var pos = 0;
         leftStart = pos;
         var left = new ClassChar(input[pos..]);
+        if (left.Length < 0) { Length = -1; return; }
         pos += left.Length;
         if (pos >= input.Length || input[pos] != '-')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         rightStart = pos;
         var right = new ClassChar(input[pos..]);
+        if (right.Length < 0) { Length = -1; return; }
         pos += right.Length;
         Length = pos;
     }
@@ -1356,10 +1252,10 @@ public readonly ref struct ShorthandClass : IRule
         this.parentKind = parentKind;
         var i = 0;
         if (i >= input.Length || input[i] != '\\')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         i++;
         if (i >= input.Length || !IsWordWDigitDSpaceSChar(input[i]))
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         i++;
         Length = i;
     }
@@ -1392,7 +1288,7 @@ public readonly ref struct PropertyName : IRule
         this.parentKind = parentKind;
         var i = 0;
         if (i >= input.Length || !IsAToZAToZ5FChar(input[i]))
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         i++;
         while (i < input.Length && IsAToZAToZ5F0To93DChar(input[i]))
             i++;
@@ -1431,19 +1327,20 @@ public readonly ref struct UnicodePropertyClass : IRule
         this.parentKind = parentKind;
         var pos = 0;
         if (pos >= input.Length || input[pos] != '\\')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         if (pos >= input.Length || input[pos] != 'p')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         if (pos >= input.Length || input[pos] != '{')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         propertyNameStart = pos;
         var propertyName = new PropertyName(input[pos..]);
+        if (propertyName.Length < 0) { Length = -1; return; }
         pos += propertyName.Length;
         if (pos >= input.Length || input[pos] != '}')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         Length = pos;
     }
@@ -1480,6 +1377,7 @@ public readonly ref struct SingleClassChar : IRule
         var pos = 0;
         classCharStart = pos;
         var classChar = new ClassChar(input[pos..]);
+        if (classChar.Length < 0) { Length = -1; return; }
         pos += classChar.Length;
         Length = pos;
     }
@@ -1516,36 +1414,21 @@ public readonly ref struct ClassRange : IRule
         this.input = input;
         this.parentInput = parentInput;
         this.parentKind = parentKind;
-        try
-        {
-            var unicodePropertyClass = new UnicodePropertyClass(input);
-            index = 3;
-            Length = unicodePropertyClass.Length;
-        }
-        catch (ParseException)
-        {
-            try
-            {
-                var charRange = new CharRange(input);
-                index = 1;
-                Length = charRange.Length;
-            }
-            catch (ParseException)
-            {
-                try
-                {
-                    var shorthandClass = new ShorthandClass(input);
-                    index = 2;
-                    Length = shorthandClass.Length;
-                }
-                catch (ParseException)
-                {
-                    var singleClassChar = new SingleClassChar(input);
-                    index = 4;
-                    Length = singleClassChar.Length;
-                }
-            }
-        }
+        var unicodePropertyClass = new UnicodePropertyClass(input);
+        index = 3;
+        Length = unicodePropertyClass.Length;
+        if (Length >= 0) return;
+        var charRange = new CharRange(input);
+        index = 1;
+        Length = charRange.Length;
+        if (Length >= 0) return;
+        var shorthandClass = new ShorthandClass(input);
+        index = 2;
+        Length = shorthandClass.Length;
+        if (Length >= 0) return;
+        var singleClassChar = new SingleClassChar(input);
+        index = 4;
+        Length = singleClassChar.Length;
     }
 
     public Input Text => input[..Length];
@@ -1605,26 +1488,21 @@ public readonly ref struct BracketedClass : IRule
         this.parentKind = parentKind;
         var pos = 0;
         if (pos >= input.Length || input[pos] != '[')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         if (pos < input.Length && input[pos] == '^')
             pos += 1;
         var firstClassRange = new ClassRange(input[pos..]);
+        if (firstClassRange.Length < 0) { Length = -1; return; }
         pos += firstClassRange.Length;
         while (true)
         {
-            try
-            {
-                var nextClassRange = new ClassRange(input[pos..]);
-                pos += nextClassRange.Length;
-            }
-            catch (ParseException)
-            {
-                break;
-            }
+            var nextClassRange = new ClassRange(input[pos..]);
+            if (nextClassRange.Length < 0) break;
+            pos += nextClassRange.Length;
         }
         if (pos >= input.Length || input[pos] != ']')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         Length = pos;
     }
@@ -1636,16 +1514,10 @@ public readonly ref struct BracketedClass : IRule
         var pos = 0;
         while (pos < Length)
         {
-            try
-            {
-                var nextClassRange = new ClassRange(input[pos..], input, 30);
-                visitor.Visit(nextClassRange);
-                pos += nextClassRange.Length;
-            }
-            catch (ParseException)
-            {
-                break;
-            }
+            var nextClassRange = new ClassRange(input[pos..], input, 30);
+            if (nextClassRange.Length < 0) break;
+            visitor.Visit(nextClassRange);
+            pos += nextClassRange.Length;
         }
     }
 
@@ -1672,18 +1544,13 @@ public readonly ref struct Class : IRule
         this.input = input;
         this.parentInput = parentInput;
         this.parentKind = parentKind;
-        try
-        {
-            var bracketedClass = new BracketedClass(input);
-            index = 1;
-            Length = bracketedClass.Length;
-        }
-        catch (ParseException)
-        {
-            var classRange = new ClassRange(input);
-            index = 2;
-            Length = classRange.Length;
-        }
+        var bracketedClass = new BracketedClass(input);
+        index = 1;
+        Length = bracketedClass.Length;
+        if (Length >= 0) return;
+        var classRange = new ClassRange(input);
+        index = 2;
+        Length = classRange.Length;
     }
 
     public Input Text => input[..Length];
@@ -1741,45 +1608,25 @@ public readonly ref struct Atom : IRule
         this.input = input;
         this.parentInput = parentInput;
         this.parentKind = parentKind;
-        try
-        {
-            var group = new Group(input);
-            index = 1;
-            Length = group.Length;
-        }
-        catch (ParseException)
-        {
-            try
-            {
-                var stringLiteral = new StringLiteral(input);
-                index = 3;
-                Length = stringLiteral.Length;
-            }
-            catch (ParseException)
-            {
-                try
-                {
-                    var charLiteral = new CharLiteral(input);
-                    index = 4;
-                    Length = charLiteral.Length;
-                }
-                catch (ParseException)
-                {
-                    try
-                    {
-                        var ruleRef = new RuleRef(input);
-                        index = 2;
-                        Length = ruleRef.Length;
-                    }
-                    catch (ParseException)
-                    {
-                        var @class = new Class(input);
-                        index = 5;
-                        Length = @class.Length;
-                    }
-                }
-            }
-        }
+        var group = new Group(input);
+        index = 1;
+        Length = group.Length;
+        if (Length >= 0) return;
+        var stringLiteral = new StringLiteral(input);
+        index = 3;
+        Length = stringLiteral.Length;
+        if (Length >= 0) return;
+        var charLiteral = new CharLiteral(input);
+        index = 4;
+        Length = charLiteral.Length;
+        if (Length >= 0) return;
+        var ruleRef = new RuleRef(input);
+        index = 2;
+        Length = ruleRef.Length;
+        if (Length >= 0) return;
+        var @class = new Class(input);
+        index = 5;
+        Length = @class.Length;
     }
 
     public Input Text => input[..Length];
@@ -1830,20 +1677,22 @@ public readonly ref struct Atom : IRule
 // ZeroOrOne -> '?'
 public readonly ref struct ZeroOrOne : IRule
 {
+    private readonly Input input;
     private readonly Input parentInput;
     private readonly Byte parentKind;
 
     public ZeroOrOne(Input input, Input parentInput = default, Byte parentKind = 0)
     {
+        this.input = input;
         this.parentInput = parentInput;
         this.parentKind = parentKind;
         if (input.Length < 1 || input[..1] is not "?")
-            throw new ParseException(new ParseError());
-        Text = input[..1];
+            { Length = -1; return; }
+        Length = 1;
     }
 
-    public Input Text { get; }
-    public Int32 Length => 1;
+    public Input Text => input[..Length];
+    public Int32 Length { get; }
 
     public void VisitChildren<T>(ref T visitor) where T : SfParser.IVisitor, allows ref struct { }
 
@@ -1871,20 +1720,22 @@ public readonly ref struct ZeroOrOne : IRule
 // ZeroOrMore -> '*'
 public readonly ref struct ZeroOrMore : IRule
 {
+    private readonly Input input;
     private readonly Input parentInput;
     private readonly Byte parentKind;
 
     public ZeroOrMore(Input input, Input parentInput = default, Byte parentKind = 0)
     {
+        this.input = input;
         this.parentInput = parentInput;
         this.parentKind = parentKind;
         if (input.Length < 1 || input[..1] is not "*")
-            throw new ParseException(new ParseError());
-        Text = input[..1];
+            { Length = -1; return; }
+        Length = 1;
     }
 
-    public Input Text { get; }
-    public Int32 Length => 1;
+    public Input Text => input[..Length];
+    public Int32 Length { get; }
 
     public void VisitChildren<T>(ref T visitor) where T : SfParser.IVisitor, allows ref struct { }
 
@@ -1912,20 +1763,22 @@ public readonly ref struct ZeroOrMore : IRule
 // OneOrMore -> '+'
 public readonly ref struct OneOrMore : IRule
 {
+    private readonly Input input;
     private readonly Input parentInput;
     private readonly Byte parentKind;
 
     public OneOrMore(Input input, Input parentInput = default, Byte parentKind = 0)
     {
+        this.input = input;
         this.parentInput = parentInput;
         this.parentKind = parentKind;
         if (input.Length < 1 || input[..1] is not "+")
-            throw new ParseException(new ParseError());
-        Text = input[..1];
+            { Length = -1; return; }
+        Length = 1;
     }
 
-    public Input Text { get; }
-    public Int32 Length => 1;
+    public Input Text => input[..Length];
+    public Int32 Length { get; }
 
     public void VisitChildren<T>(ref T visitor) where T : SfParser.IVisitor, allows ref struct { }
 
@@ -1966,13 +1819,14 @@ public readonly ref struct Exactly : IRule
         this.parentKind = parentKind;
         var pos = 0;
         if (pos >= input.Length || input[pos] != '{')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         numberStart = pos;
         var number = new Number(input[pos..]);
+        if (number.Length < 0) { Length = -1; return; }
         pos += number.Length;
         if (pos >= input.Length || input[pos] != '}')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         Length = pos;
     }
@@ -2008,16 +1862,17 @@ public readonly ref struct AtLeast : IRule
         this.parentKind = parentKind;
         var pos = 0;
         if (pos >= input.Length || input[pos] != '{')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         numberStart = pos;
         var number = new Number(input[pos..]);
+        if (number.Length < 0) { Length = -1; return; }
         pos += number.Length;
         if (pos >= input.Length || input[pos] != ',')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         if (pos >= input.Length || input[pos] != '}')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         Length = pos;
     }
@@ -2054,19 +1909,21 @@ public readonly ref struct Between : IRule
         this.parentKind = parentKind;
         var pos = 0;
         if (pos >= input.Length || input[pos] != '{')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         leftStart = pos;
         var left = new Number(input[pos..]);
+        if (left.Length < 0) { Length = -1; return; }
         pos += left.Length;
         if (pos >= input.Length || input[pos] != ',')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         rightStart = pos;
         var right = new Number(input[pos..]);
+        if (right.Length < 0) { Length = -1; return; }
         pos += right.Length;
         if (pos >= input.Length || input[pos] != '}')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         Length = pos;
     }
@@ -2108,54 +1965,29 @@ public readonly ref struct Quantifier : IRule
         this.input = input;
         this.parentInput = parentInput;
         this.parentKind = parentKind;
-        try
-        {
-            var between = new Between(input);
-            index = 6;
-            Length = between.Length;
-        }
-        catch (ParseException)
-        {
-            try
-            {
-                var atLeast = new AtLeast(input);
-                index = 5;
-                Length = atLeast.Length;
-            }
-            catch (ParseException)
-            {
-                try
-                {
-                    var exactly = new Exactly(input);
-                    index = 4;
-                    Length = exactly.Length;
-                }
-                catch (ParseException)
-                {
-                    try
-                    {
-                        var zeroOrOne = new ZeroOrOne(input);
-                        index = 1;
-                        Length = zeroOrOne.Length;
-                    }
-                    catch (ParseException)
-                    {
-                        try
-                        {
-                            var zeroOrMore = new ZeroOrMore(input);
-                            index = 2;
-                            Length = zeroOrMore.Length;
-                        }
-                        catch (ParseException)
-                        {
-                            var oneOrMore = new OneOrMore(input);
-                            index = 3;
-                            Length = oneOrMore.Length;
-                        }
-                    }
-                }
-            }
-        }
+        var between = new Between(input);
+        index = 6;
+        Length = between.Length;
+        if (Length >= 0) return;
+        var atLeast = new AtLeast(input);
+        index = 5;
+        Length = atLeast.Length;
+        if (Length >= 0) return;
+        var exactly = new Exactly(input);
+        index = 4;
+        Length = exactly.Length;
+        if (Length >= 0) return;
+        var zeroOrOne = new ZeroOrOne(input);
+        index = 1;
+        Length = zeroOrOne.Length;
+        if (Length >= 0) return;
+        var zeroOrMore = new ZeroOrMore(input);
+        index = 2;
+        Length = zeroOrMore.Length;
+        if (Length >= 0) return;
+        var oneOrMore = new OneOrMore(input);
+        index = 3;
+        Length = oneOrMore.Length;
     }
 
     public Input Text => input[..Length];
@@ -2224,14 +2056,11 @@ public readonly ref struct Item : IRule
         var pos = 0;
         atomStart = pos;
         var atom = new Atom(input[pos..]);
+        if (atom.Length < 0) { Length = -1; return; }
         pos += atom.Length;
         quantifierStart = pos;
-        try
-        {
-            var quantifier = new Quantifier(input[pos..]);
-            pos += quantifier.Length;
-        }
-        catch (ParseException) { }
+        var quantifier = new Quantifier(input[pos..]);
+        if (quantifier.Length >= 0) pos += quantifier.Length;
         Length = pos;
     }
 
@@ -2242,11 +2071,8 @@ public readonly ref struct Item : IRule
     public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
     {
         visitor.Visit(new Atom(input[atomStart..], input, 40));
-        try
-        {
-            visitor.Visit(new Quantifier(input[quantifierStart..], input, 40));
-        }
-        catch (ParseException) { }
+        var quantifierOpt = new Quantifier(input[quantifierStart..], input, 40);
+        if (quantifierOpt.Length >= 0) visitor.Visit(quantifierOpt);
     }
 
     public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
@@ -2273,11 +2099,13 @@ public readonly ref struct Alternative : IRule
         var pos = 0;
         itemStart = pos;
         var item = new Item(input[pos..]);
+        if (item.Length < 0) { Length = -1; return; }
         pos += item.Length;
         while (pos < input.Length && input[pos] == ' ')
         {
             pos += 1;
             var next = new Item(input[pos..]);
+            if (next.Length < 0) break;
             pos += next.Length;
         }
         Length = pos;
@@ -2293,15 +2121,13 @@ public readonly ref struct Alternative : IRule
         var pos = itemStart + item.Length;
         while (pos < Length)
         {
-            try
-            {
-                if (pos >= input.Length || input[pos] != ' ') break;
-                pos += 1;
-                var nextItem = new Item(input[pos..], input, 41);
-                visitor.Visit(nextItem);
-                pos += nextItem.Length;
-            }
-            catch (ParseException) { break; }
+            var savedPos = pos;
+            if (pos >= input.Length || input[pos] != ' ') { pos = savedPos; break; }
+            pos += 1;
+            var nextItem = new Item(input[pos..], input, 41);
+            if (nextItem.Length < 0) { pos = savedPos; break; }
+            visitor.Visit(nextItem);
+            pos += nextItem.Length;
         }
     }
 
@@ -2328,19 +2154,20 @@ public readonly ref struct InlineAlternatives : IRule
         this.parentKind = parentKind;
         var pos = 0;
         if (pos >= input.Length || input[pos] != ' ')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         if (pos >= input.Length || input[pos] != '-')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         if (pos >= input.Length || input[pos] != '>')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         if (pos >= input.Length || input[pos] != ' ')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         alternativeStart = pos;
         var alternative = new Alternative(input[pos..]);
+        if (alternative.Length < 0) { Length = -1; return; }
         pos += alternative.Length;
         Length = pos;
     }
@@ -2385,7 +2212,7 @@ public readonly ref struct Indentation : IRule
             Length = 1;
             return;
         }
-        throw new ParseException(new ParseError());
+        Length = -1;
     }
 
     public Input Text => input[..Length];
@@ -2415,13 +2242,15 @@ public readonly ref struct IndentedAlternative : IRule
         this.parentKind = parentKind;
         var pos = 0;
         if (pos >= input.Length || input[pos] != '\n')
-            throw new ParseException(new ParseError());
+            { Length = -1; return; }
         pos += 1;
         indentationStart = pos;
         var indentation = new Indentation(input[pos..]);
+        if (indentation.Length < 0) { Length = -1; return; }
         pos += indentation.Length;
         alternativeStart = pos;
         var alternative = new Alternative(input[pos..]);
+        if (alternative.Length < 0) { Length = -1; return; }
         pos += alternative.Length;
         Length = pos;
     }
@@ -2458,18 +2287,13 @@ public readonly ref struct IndentedAlternatives : IRule
         this.parentKind = parentKind;
         var pos = 0;
         var firstIndentedAlternative = new IndentedAlternative(input[pos..]);
+        if (firstIndentedAlternative.Length < 0) { Length = -1; return; }
         pos += firstIndentedAlternative.Length;
         while (true)
         {
-            try
-            {
-                var nextIndentedAlternative = new IndentedAlternative(input[pos..]);
-                pos += nextIndentedAlternative.Length;
-            }
-            catch (ParseException)
-            {
-                break;
-            }
+            var nextIndentedAlternative = new IndentedAlternative(input[pos..]);
+            if (nextIndentedAlternative.Length < 0) break;
+            pos += nextIndentedAlternative.Length;
         }
         Length = pos;
     }
@@ -2481,16 +2305,10 @@ public readonly ref struct IndentedAlternatives : IRule
         var pos = 0;
         while (pos < Length)
         {
-            try
-            {
-                var nextIndentedAlternative = new IndentedAlternative(input[pos..], input, 45);
-                visitor.Visit(nextIndentedAlternative);
-                pos += nextIndentedAlternative.Length;
-            }
-            catch (ParseException)
-            {
-                break;
-            }
+            var nextIndentedAlternative = new IndentedAlternative(input[pos..], input, 45);
+            if (nextIndentedAlternative.Length < 0) break;
+            visitor.Visit(nextIndentedAlternative);
+            pos += nextIndentedAlternative.Length;
         }
     }
 
@@ -2516,18 +2334,13 @@ public readonly ref struct Alternatives : IRule
         this.input = input;
         this.parentInput = parentInput;
         this.parentKind = parentKind;
-        try
-        {
-            var inlineAlternatives = new InlineAlternatives(input);
-            index = 1;
-            Length = inlineAlternatives.Length;
-        }
-        catch (ParseException)
-        {
-            var indentedAlternatives = new IndentedAlternatives(input);
-            index = 2;
-            Length = indentedAlternatives.Length;
-        }
+        var inlineAlternatives = new InlineAlternatives(input);
+        index = 1;
+        Length = inlineAlternatives.Length;
+        if (Length >= 0) return;
+        var indentedAlternatives = new IndentedAlternatives(input);
+        index = 2;
+        Length = indentedAlternatives.Length;
     }
 
     public Input Text => input[..Length];
@@ -2584,9 +2397,11 @@ public readonly ref struct Rule : IRule
         var pos = 0;
         nameStart = pos;
         var name = new Name(input[pos..]);
+        if (name.Length < 0) { Length = -1; return; }
         pos += name.Length;
         alternativesStart = pos;
         var alternatives = new Alternatives(input[pos..]);
+        if (alternatives.Length < 0) { Length = -1; return; }
         pos += alternatives.Length;
         Length = pos;
     }
@@ -2625,26 +2440,20 @@ public readonly ref struct Grammar : IRule
         var pos = 0;
         ruleStart = pos;
         var rule = new Rule(input[pos..]);
+        if (rule.Length < 0) { Length = -1; return; }
         pos += rule.Length;
         while (true)
         {
             var savedPos = pos;
-            try
-            {
-                if (!input[pos..].StartsWith("\n"))
-                    throw new ParseException(new ParseError());
-                pos += 1;
-                if (!input[pos..].StartsWith("\n"))
-                    throw new ParseException(new ParseError());
-                pos += 1;
-                var nextRule = new Rule(input[pos..]);
-                pos += nextRule.Length;
-            }
-            catch (ParseException)
-            {
-                pos = savedPos;
-                break;
-            }
+            if (!input[pos..].StartsWith("\n"))
+                { pos = savedPos; break; }
+            pos += 1;
+            if (!input[pos..].StartsWith("\n"))
+                { pos = savedPos; break; }
+            pos += 1;
+            var nextRule = new Rule(input[pos..]);
+            if (nextRule.Length < 0) { pos = savedPos; break; }
+            pos += nextRule.Length;
         }
         Length = pos;
     }
@@ -2659,19 +2468,17 @@ public readonly ref struct Grammar : IRule
         var pos = ruleStart + rule.Length;
         while (pos < Length)
         {
-            try
-            {
-                if (pos >= input.Length || input[pos] != '\n') break;
+            var savedPos = pos;
+            if (pos >= input.Length || input[pos] != '\n') { pos = savedPos; break; }
+            pos += 1;
+            if (pos >= input.Length || input[pos] != '\n') { pos = savedPos; break; }
+            pos += 1;
+            while (pos < input.Length && input[pos] == '\n')
                 pos += 1;
-                if (pos >= input.Length || input[pos] != '\n') break;
-                pos += 1;
-                while (pos < input.Length && input[pos] == '\n')
-                    pos += 1;
-                var nextRule = new Rule(input[pos..], input, 48);
-                visitor.Visit(nextRule);
-                pos += nextRule.Length;
-            }
-            catch (ParseException) { break; }
+            var nextRule = new Rule(input[pos..], input, 48);
+            if (nextRule.Length < 0) { pos = savedPos; break; }
+            visitor.Visit(nextRule);
+            pos += nextRule.Length;
         }
     }
 

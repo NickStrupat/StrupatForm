@@ -24,7 +24,8 @@ public class SfParserTests
     [Fact]
     public void ParseNameRejectsDigitStart()
     {
-        Assert.Throws<ParseException>(() => { _ = new Name("123abc"); });
+        var name = new Name("123abc");
+        name.Length.Should().Be(-1);
     }
 
     [Fact]

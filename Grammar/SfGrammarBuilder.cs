@@ -146,23 +146,18 @@ public static class SfGrammarBuilder
 
     static Quantifier BuildQuantifier(SfParser.Item item)
     {
-        try
-        {
-            var q = new SfParser.Quantifier(item.Text.Slice(item.Atom.Length));
-            var qText = new String(q.Text);
-            return qText[0] switch
-            {
-                '?' => new Quantifier { Min = 0, Max = 1 },
-                '*' => new Quantifier { Min = 0, Max = null },
-                '+' => new Quantifier { Min = 1, Max = null },
-                '{' => ParseBraceQuantifier(qText),
-                _ => new Quantifier { Min = 1, Max = 1 }
-            };
-        }
-        catch (SfParser.ParseException)
-        {
+        var q = new SfParser.Quantifier(item.Text.Slice(item.Atom.Length));
+        if (q.Length < 0)
             return new Quantifier { Min = 1, Max = 1 };
-        }
+        var qText = new String(q.Text);
+        return qText[0] switch
+        {
+            '?' => new Quantifier { Min = 0, Max = 1 },
+            '*' => new Quantifier { Min = 0, Max = null },
+            '+' => new Quantifier { Min = 1, Max = null },
+            '{' => ParseBraceQuantifier(qText),
+            _ => new Quantifier { Min = 1, Max = 1 }
+        };
     }
 
     static Quantifier ParseBraceQuantifier(String text)
