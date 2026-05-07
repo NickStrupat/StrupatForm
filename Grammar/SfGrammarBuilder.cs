@@ -27,7 +27,7 @@ public static class SfGrammarBuilder
             {
                 var r = new SfParser.Rule(rule.Text);
                 var name = new String(r.Name.Text);
-                if (!grammar.Rules.Add(new Rule { Name = name }))
+                if (!grammar.Rules.TryAdd(name, new Rule { Name = name }))
                     throw new Exception($"Rule `{name}` defined multiple times");
             }
         }
@@ -41,7 +41,7 @@ public static class SfGrammarBuilder
             {
                 var r = new SfParser.Rule(rule.Text);
                 var name = new String(r.Name.Text);
-                var astRule = grammar.Rules.Get(name);
+                var astRule = grammar.Rules[name];
 
                 var alts = r.Alternatives;
                 var altVisitor = new AlternativesVisitor(grammar, astRule);
@@ -116,7 +116,7 @@ public static class SfGrammarBuilder
         public void Visit(in SfParser.RuleRef ruleRef)
         {
             var name = new String(ruleRef.Name.Text);
-            var rule = grammar.Rules.Get(name);
+            var rule = grammar.Rules[name];
             rule.RefCount++;
             astAlt.Items.Add(new RuleRef { Name = name, Rule = rule, Quantifier = quantifier });
         }

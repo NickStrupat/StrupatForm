@@ -1,13 +1,12 @@
 using System.Collections.Concurrent;
 using System.Text;
 using System.Text.RegularExpressions;
-using NickStrupat;
 
 namespace StrupatForm;
 
 public sealed class Grammar
 {
-	public HashSet<Rule> Rules { get; } = new(EqCmp<Rule>.Create(x => x.Name));
+	public Dictionary<String, Rule> Rules { get; } = new();
 }
 
 public sealed class Rule

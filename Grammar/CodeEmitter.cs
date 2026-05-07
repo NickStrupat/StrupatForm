@@ -75,7 +75,7 @@ public static class CodeEmitter
 
     static void DetectLeftRecursion(Grammar grammar)
     {
-        foreach (var rule in grammar.Rules)
+        foreach (var rule in grammar.Rules.Values)
             DetectLeftRecursion(rule, rule, new HashSet<String>(), grammar);
     }
 
@@ -102,7 +102,7 @@ public static class CodeEmitter
     static Dictionary<Rule, RuleKind> BuildKindMap(Grammar grammar)
     {
         var map = new Dictionary<Rule, RuleKind>();
-        foreach (var rule in grammar.Rules)
+        foreach (var rule in grammar.Rules.Values)
         {
             if (IsAlternativeRule(rule))
                 map[rule] = RuleKind.Alternative;
@@ -126,7 +126,7 @@ public static class CodeEmitter
     static Dictionary<Rule, String?> BuildFirstTokenMap(Grammar grammar)
     {
         var map = new Dictionary<Rule, String?>();
-        foreach (var rule in grammar.Rules)
+        foreach (var rule in grammar.Rules.Values)
             map[rule] = ComputeFirstToken(rule, new HashSet<String>());
         return map;
     }
@@ -168,7 +168,7 @@ public static class CodeEmitter
             result.Add(rule);
         }
 
-        foreach (var rule in grammar.Rules)
+        foreach (var rule in grammar.Rules.Values)
             Visit(rule);
 
         return result;
