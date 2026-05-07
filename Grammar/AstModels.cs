@@ -1,6 +1,4 @@
-using System.Collections.Concurrent;
 using System.Text;
-using System.Text.RegularExpressions;
 
 namespace StrupatForm;
 
@@ -14,7 +12,6 @@ public sealed class Rule
 	public required String Name { get; init; }
 	public List<Alternative> Alternatives { get; } = new();
 	public override String ToString() => Name;
-	public Int32 RefCount { get; set; }
 }
 
 public sealed class Alternative : Item
@@ -50,7 +47,6 @@ public sealed class Class : Item
 
 public abstract class Range : IEquatable<Range>
 {
-	public abstract Boolean Contains(Rune r);
 	public abstract Boolean Equals(Range? other);
 }
 
@@ -58,7 +54,6 @@ public sealed class CharacterRange : Range
 {
 	public required Rune From { get; init; }
 	public required Rune To { get; init; }
-	public override Boolean Contains(Rune r) => From <= r && r <= To;
 	public override Boolean Equals(Range? other) => other is CharacterRange cr && (From, To) == (cr.From, cr.To);
 	public override String ToString() => From == To ? $"{From}" : $"{From}-{To}";
 }
@@ -66,17 +61,7 @@ public sealed class CharacterRange : Range
 public sealed class RegexCharacterRange : Range
 {
 	public required String Pattern { get; init; }
-	public override Boolean Contains(Rune r)
-	{
-		Span<Char> chars = stackalloc Char[2];
-		var n = r.EncodeToUtf16(chars);
-		return Regex.IsMatch(chars[..n]);
-	}
-
 	public override Boolean Equals(Range? other) => other is RegexCharacterRange rcr && Pattern == rcr.Pattern;
-
-	private Regex Regex => Cache.GetOrAdd(Pattern, x => new(x, RegexOptions.Compiled));
-	private static readonly ConcurrentDictionary<String, Regex> Cache = new();
 }
 
 public abstract class Literal : Item  {}

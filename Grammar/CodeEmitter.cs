@@ -1344,48 +1344,6 @@ public static class CodeEmitter
         return (withKeyword, ambiguous);
     }
 
-    static String? GetFirstCharCondition(Rule rule, EmitContext ctx, HashSet<String> visited)
-    {
-        if (!visited.Add(rule.Name))
-            return null;
-        if (rule.Alternatives.Count == 0)
-            return null;
-
-        var conditions = new List<String>();
-        foreach (var alt in rule.Alternatives)
-        {
-            if (alt.Items.Count == 0) continue;
-            var firstItem = alt.Items[0];
-            if (firstItem is Class c)
-            {
-                var preds = c.Ranges.Select(r => RangeToCondition(r, "input[0]")).ToList();
-                var combined = String.Join(" || ", preds);
-                if (c.Negated) combined = $"!({combined})";
-                conditions.Add(combined);
-            }
-            else if (firstItem is Literal<Char> lc)
-            {
-                conditions.Add($"input[0] == '{EscapeChar(lc.Value)}'");
-            }
-            else if (firstItem is Literal<String> ls && ls.Value.Length > 0)
-            {
-                conditions.Add($"input[0] == '{EscapeChar(ls.Value[0])}'");
-            }
-            else if (firstItem is RuleRef rr)
-            {
-                var sub = GetFirstCharCondition(rr.Rule, ctx, new HashSet<String>(visited));
-                if (sub != null)
-                {
-                    var stripped = sub.Replace("input.Length > 0 && ", "");
-                    conditions.Add(stripped);
-                }
-            }
-        }
-
-        if (conditions.Count == 0) return null;
-        var allConditions = String.Join(" || ", conditions.Distinct());
-        return $"input.Length > 0 && ({allConditions})";
-    }
 
     static void EmitAlternativeBranch(String condition, RuleRef rr, Int32 index, Boolean isFirst, EmitContext ctx)
     {

@@ -117,7 +117,6 @@ public static class SfGrammarBuilder
         {
             var name = new String(ruleRef.Name.Text);
             var rule = grammar.Rules[name];
-            rule.RefCount++;
             astAlt.Items.Add(new RuleRef { Name = name, Rule = rule, Quantifier = quantifier });
         }
 
@@ -276,7 +275,7 @@ public static class SfGrammarBuilder
         return astClass;
     }
 
-    static String Unescape(String text)
+    public static String Unescape(String text)
     {
         var sb = new StringBuilder(text.Length);
         for (var i = 0; i < text.Length; i++)
