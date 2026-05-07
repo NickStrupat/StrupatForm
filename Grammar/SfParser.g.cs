@@ -1377,720 +1377,12 @@ public readonly ref struct ShorthandClass : IRule
         (Char.IsLetter(c) || c == '_') || c == 'W' || Char.IsAsciiDigit(c) || c == 'D' || Char.IsWhiteSpace(c) || c == 'S';
 }
 
-// LetterCategory
-//     "L"
-//     "Letter"
-//     "Lu"
-//     "Uppercase_Letter"
-//     "Ll"
-//     "Lowercase_Letter"
-//     "Lt"
-//     "Titlecase_Letter"
-//     "Lm"
-//     "Modifier_Letter"
-//     "Lo"
-//     "Other_Letter"
-public readonly ref struct LetterCategory : IRule
-{
-    private readonly Input input;
-    private readonly Input parentInput;
-    private readonly Byte parentKind;
-    public Int32 Length { get; }
-
-    public LetterCategory(Input input, Input parentInput = default, Byte parentKind = 0)
-    {
-        this.input = input;
-        this.parentInput = parentInput;
-        this.parentKind = parentKind;
-        if (input.Length >= 16 && input[..16] is "Uppercase_Letter" or "Lowercase_Letter" or "Titlecase_Letter")
-        {
-            Length = 16;
-            return;
-        }
-        if (input.Length >= 15 && input[..15] is "Modifier_Letter")
-        {
-            Length = 15;
-            return;
-        }
-        if (input.Length >= 12 && input[..12] is "Other_Letter")
-        {
-            Length = 12;
-            return;
-        }
-        if (input.Length >= 6 && input[..6] is "Letter")
-        {
-            Length = 6;
-            return;
-        }
-        if (input.Length >= 2 && input[..2] is "Lu" or "Ll" or "Lt" or "Lm" or "Lo")
-        {
-            Length = 2;
-            return;
-        }
-        if (input.Length >= 1 && input[..1] is "L")
-        {
-            Length = 1;
-            return;
-        }
-        throw new ParseException(new ParseError());
-    }
-
-    public Input Text => input[..Length];
-
-    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }
-
-    public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
-    {
-        Rules.Visit(parentKind, parentInput, ref visitor);
-    }
-}
-
-// MarkCategory
-//     "M"
-//     "Mark"
-//     "Mn"
-//     "Nonspacing_Mark"
-//     "Mc"
-//     "Spacing_Mark"
-//     "Me"
-//     "Enclosing_Mark"
-public readonly ref struct MarkCategory : IRule
-{
-    private readonly Input input;
-    private readonly Input parentInput;
-    private readonly Byte parentKind;
-    public Int32 Length { get; }
-
-    public MarkCategory(Input input, Input parentInput = default, Byte parentKind = 0)
-    {
-        this.input = input;
-        this.parentInput = parentInput;
-        this.parentKind = parentKind;
-        if (input.Length >= 15 && input[..15] is "Nonspacing_Mark")
-        {
-            Length = 15;
-            return;
-        }
-        if (input.Length >= 14 && input[..14] is "Enclosing_Mark")
-        {
-            Length = 14;
-            return;
-        }
-        if (input.Length >= 12 && input[..12] is "Spacing_Mark")
-        {
-            Length = 12;
-            return;
-        }
-        if (input.Length >= 4 && input[..4] is "Mark")
-        {
-            Length = 4;
-            return;
-        }
-        if (input.Length >= 2 && input[..2] is "Mn" or "Mc" or "Me")
-        {
-            Length = 2;
-            return;
-        }
-        if (input.Length >= 1 && input[..1] is "M")
-        {
-            Length = 1;
-            return;
-        }
-        throw new ParseException(new ParseError());
-    }
-
-    public Input Text => input[..Length];
-
-    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }
-
-    public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
-    {
-        Rules.Visit(parentKind, parentInput, ref visitor);
-    }
-}
-
-// NumberCategory
-//     "N"
-//     "Number"
-//     "Nd"
-//     "Decimal_Number"
-//     "Nl"
-//     "Letter_Number"
-//     "No"
-//     "Other_Number"
-public readonly ref struct NumberCategory : IRule
-{
-    private readonly Input input;
-    private readonly Input parentInput;
-    private readonly Byte parentKind;
-    public Int32 Length { get; }
-
-    public NumberCategory(Input input, Input parentInput = default, Byte parentKind = 0)
-    {
-        this.input = input;
-        this.parentInput = parentInput;
-        this.parentKind = parentKind;
-        if (input.Length >= 14 && input[..14] is "Decimal_Number")
-        {
-            Length = 14;
-            return;
-        }
-        if (input.Length >= 13 && input[..13] is "Letter_Number")
-        {
-            Length = 13;
-            return;
-        }
-        if (input.Length >= 12 && input[..12] is "Other_Number")
-        {
-            Length = 12;
-            return;
-        }
-        if (input.Length >= 6 && input[..6] is "Number")
-        {
-            Length = 6;
-            return;
-        }
-        if (input.Length >= 2 && input[..2] is "Nd" or "Nl" or "No")
-        {
-            Length = 2;
-            return;
-        }
-        if (input.Length >= 1 && input[..1] is "N")
-        {
-            Length = 1;
-            return;
-        }
-        throw new ParseException(new ParseError());
-    }
-
-    public Input Text => input[..Length];
-
-    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }
-
-    public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
-    {
-        Rules.Visit(parentKind, parentInput, ref visitor);
-    }
-}
-
-// PunctuationCategory
-//     "P"
-//     "Punctuation"
-//     "Pc"
-//     "Connector_Punctuation"
-//     "Pd"
-//     "Dash_Punctuation"
-//     "Ps"
-//     "Open_Punctuation"
-//     "Pe"
-//     "Close_Punctuation"
-//     "Pi"
-//     "Initial_Punctuation"
-//     "Pf"
-//     "Final_Punctuation"
-//     "Po"
-//     "Other_Punctuation"
-public readonly ref struct PunctuationCategory : IRule
-{
-    private readonly Input input;
-    private readonly Input parentInput;
-    private readonly Byte parentKind;
-    public Int32 Length { get; }
-
-    public PunctuationCategory(Input input, Input parentInput = default, Byte parentKind = 0)
-    {
-        this.input = input;
-        this.parentInput = parentInput;
-        this.parentKind = parentKind;
-        if (input.Length >= 21 && input[..21] is "Connector_Punctuation")
-        {
-            Length = 21;
-            return;
-        }
-        if (input.Length >= 19 && input[..19] is "Initial_Punctuation")
-        {
-            Length = 19;
-            return;
-        }
-        if (input.Length >= 17 && input[..17] is "Close_Punctuation" or "Final_Punctuation" or "Other_Punctuation")
-        {
-            Length = 17;
-            return;
-        }
-        if (input.Length >= 16 && input[..16] is "Dash_Punctuation" or "Open_Punctuation")
-        {
-            Length = 16;
-            return;
-        }
-        if (input.Length >= 11 && input[..11] is "Punctuation")
-        {
-            Length = 11;
-            return;
-        }
-        if (input.Length >= 2 && input[..2] is "Pc" or "Pd" or "Ps" or "Pe" or "Pi" or "Pf" or "Po")
-        {
-            Length = 2;
-            return;
-        }
-        if (input.Length >= 1 && input[..1] is "P")
-        {
-            Length = 1;
-            return;
-        }
-        throw new ParseException(new ParseError());
-    }
-
-    public Input Text => input[..Length];
-
-    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }
-
-    public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
-    {
-        Rules.Visit(parentKind, parentInput, ref visitor);
-    }
-}
-
-// SymbolCategory
-//     "S"
-//     "Symbol"
-//     "Sm"
-//     "Math_Symbol"
-//     "Sc"
-//     "Currency_Symbol"
-//     "Sk"
-//     "Modifier_Symbol"
-//     "So"
-//     "Other_Symbol"
-public readonly ref struct SymbolCategory : IRule
-{
-    private readonly Input input;
-    private readonly Input parentInput;
-    private readonly Byte parentKind;
-    public Int32 Length { get; }
-
-    public SymbolCategory(Input input, Input parentInput = default, Byte parentKind = 0)
-    {
-        this.input = input;
-        this.parentInput = parentInput;
-        this.parentKind = parentKind;
-        if (input.Length >= 15 && input[..15] is "Currency_Symbol" or "Modifier_Symbol")
-        {
-            Length = 15;
-            return;
-        }
-        if (input.Length >= 12 && input[..12] is "Other_Symbol")
-        {
-            Length = 12;
-            return;
-        }
-        if (input.Length >= 11 && input[..11] is "Math_Symbol")
-        {
-            Length = 11;
-            return;
-        }
-        if (input.Length >= 6 && input[..6] is "Symbol")
-        {
-            Length = 6;
-            return;
-        }
-        if (input.Length >= 2 && input[..2] is "Sm" or "Sc" or "Sk" or "So")
-        {
-            Length = 2;
-            return;
-        }
-        if (input.Length >= 1 && input[..1] is "S")
-        {
-            Length = 1;
-            return;
-        }
-        throw new ParseException(new ParseError());
-    }
-
-    public Input Text => input[..Length];
-
-    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }
-
-    public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
-    {
-        Rules.Visit(parentKind, parentInput, ref visitor);
-    }
-}
-
-// SeparatorCategory
-//     "Z"
-//     "Separator"
-//     "Zs"
-//     "Space_Separator"
-//     "Zl"
-//     "Line_Separator"
-//     "Zp"
-//     "Paragraph_Separator"
-public readonly ref struct SeparatorCategory : IRule
-{
-    private readonly Input input;
-    private readonly Input parentInput;
-    private readonly Byte parentKind;
-    public Int32 Length { get; }
-
-    public SeparatorCategory(Input input, Input parentInput = default, Byte parentKind = 0)
-    {
-        this.input = input;
-        this.parentInput = parentInput;
-        this.parentKind = parentKind;
-        if (input.Length >= 19 && input[..19] is "Paragraph_Separator")
-        {
-            Length = 19;
-            return;
-        }
-        if (input.Length >= 15 && input[..15] is "Space_Separator")
-        {
-            Length = 15;
-            return;
-        }
-        if (input.Length >= 14 && input[..14] is "Line_Separator")
-        {
-            Length = 14;
-            return;
-        }
-        if (input.Length >= 9 && input[..9] is "Separator")
-        {
-            Length = 9;
-            return;
-        }
-        if (input.Length >= 2 && input[..2] is "Zs" or "Zl" or "Zp")
-        {
-            Length = 2;
-            return;
-        }
-        if (input.Length >= 1 && input[..1] is "Z")
-        {
-            Length = 1;
-            return;
-        }
-        throw new ParseException(new ParseError());
-    }
-
-    public Input Text => input[..Length];
-
-    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }
-
-    public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
-    {
-        Rules.Visit(parentKind, parentInput, ref visitor);
-    }
-}
-
-// OtherCategory
-//     "C"
-//     "Other"
-//     "Cc"
-//     "Control"
-//     "Cf"
-//     "Format"
-//     "Cs"
-//     "Surrogate"
-//     "Co"
-//     "Private_Use"
-//     "Cn"
-//     "Unassigned"
-public readonly ref struct OtherCategory : IRule
-{
-    private readonly Input input;
-    private readonly Input parentInput;
-    private readonly Byte parentKind;
-    public Int32 Length { get; }
-
-    public OtherCategory(Input input, Input parentInput = default, Byte parentKind = 0)
-    {
-        this.input = input;
-        this.parentInput = parentInput;
-        this.parentKind = parentKind;
-        if (input.Length >= 11 && input[..11] is "Private_Use")
-        {
-            Length = 11;
-            return;
-        }
-        if (input.Length >= 10 && input[..10] is "Unassigned")
-        {
-            Length = 10;
-            return;
-        }
-        if (input.Length >= 9 && input[..9] is "Surrogate")
-        {
-            Length = 9;
-            return;
-        }
-        if (input.Length >= 7 && input[..7] is "Control")
-        {
-            Length = 7;
-            return;
-        }
-        if (input.Length >= 6 && input[..6] is "Format")
-        {
-            Length = 6;
-            return;
-        }
-        if (input.Length >= 5 && input[..5] is "Other")
-        {
-            Length = 5;
-            return;
-        }
-        if (input.Length >= 2 && input[..2] is "Cc" or "Cf" or "Cs" or "Co" or "Cn")
-        {
-            Length = 2;
-            return;
-        }
-        if (input.Length >= 1 && input[..1] is "C")
-        {
-            Length = 1;
-            return;
-        }
-        throw new ParseException(new ParseError());
-    }
-
-    public Input Text => input[..Length];
-
-    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }
-
-    public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
-    {
-        Rules.Visit(parentKind, parentInput, ref visitor);
-    }
-}
-
-// CategoryName
-//     LetterCategory
-//     MarkCategory
-//     NumberCategory
-//     PunctuationCategory
-//     SymbolCategory
-//     SeparatorCategory
-//     OtherCategory
-public readonly ref struct CategoryName : IRule
-{
-    private readonly Input input;
-    private readonly Input parentInput;
-    private readonly Byte parentKind;
-    private readonly Byte index;
-    public Int32 Length { get; }
-
-    public CategoryName(Input input, Input parentInput = default, Byte parentKind = 0)
-    {
-        this.input = input;
-        this.parentInput = parentInput;
-        this.parentKind = parentKind;
-        try
-        {
-            var letterCategory = new LetterCategory(input);
-            index = 1;
-            Length = letterCategory.Length;
-        }
-        catch (ParseException)
-        {
-            try
-            {
-                var markCategory = new MarkCategory(input);
-                index = 2;
-                Length = markCategory.Length;
-            }
-            catch (ParseException)
-            {
-                try
-                {
-                    var numberCategory = new NumberCategory(input);
-                    index = 3;
-                    Length = numberCategory.Length;
-                }
-                catch (ParseException)
-                {
-                    try
-                    {
-                        var punctuationCategory = new PunctuationCategory(input);
-                        index = 4;
-                        Length = punctuationCategory.Length;
-                    }
-                    catch (ParseException)
-                    {
-                        try
-                        {
-                            var symbolCategory = new SymbolCategory(input);
-                            index = 5;
-                            Length = symbolCategory.Length;
-                        }
-                        catch (ParseException)
-                        {
-                            try
-                            {
-                                var separatorCategory = new SeparatorCategory(input);
-                                index = 6;
-                                Length = separatorCategory.Length;
-                            }
-                            catch (ParseException)
-                            {
-                                var otherCategory = new OtherCategory(input);
-                                index = 7;
-                                Length = otherCategory.Length;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    public Input Text => input[..Length];
-
-    public void VisitChildren<T>(ref T visitor) where T : SfParser.IVisitor, allows ref struct
-    {
-        switch (index)
-        {
-            case 1: visitor.Visit(new LetterCategory(input, input, 33)); break;
-            case 2: visitor.Visit(new MarkCategory(input, input, 33)); break;
-            case 3: visitor.Visit(new NumberCategory(input, input, 33)); break;
-            case 4: visitor.Visit(new PunctuationCategory(input, input, 33)); break;
-            case 5: visitor.Visit(new SymbolCategory(input, input, 33)); break;
-            case 6: visitor.Visit(new SeparatorCategory(input, input, 33)); break;
-            case 7: visitor.Visit(new OtherCategory(input, input, 33)); break;
-        }
-    }
-
-    public void Visit<T>(T visitor) where T : IVisitor
-    {
-        switch (index)
-        {
-            case 0: throw new UninitializedInstanceException();
-            case 1: visitor.Visit(new LetterCategory(input)); break;
-            case 2: visitor.Visit(new MarkCategory(input)); break;
-            case 3: visitor.Visit(new NumberCategory(input)); break;
-            case 4: visitor.Visit(new PunctuationCategory(input)); break;
-            case 5: visitor.Visit(new SymbolCategory(input)); break;
-            case 6: visitor.Visit(new SeparatorCategory(input)); break;
-            case 7: visitor.Visit(new OtherCategory(input)); break;
-            case Byte.MaxValue: visitor.Visit(new ParseError()); break;
-            default: throw new ArgumentOutOfRangeException(nameof(index));
-        }
-    }
-
-    public void VisitParent<T>(ref T visitor) where T : SfParser.IVisitor, allows ref struct
-    {
-        Rules.Visit(parentKind, parentInput, ref visitor);
-    }
-
-    public interface IVisitor
-    {
-        void Visit(in ParseError parseError);
-        void Visit(in LetterCategory letterCategory);
-        void Visit(in MarkCategory markCategory);
-        void Visit(in NumberCategory numberCategory);
-        void Visit(in PunctuationCategory punctuationCategory);
-        void Visit(in SymbolCategory symbolCategory);
-        void Visit(in SeparatorCategory separatorCategory);
-        void Visit(in OtherCategory otherCategory);
-    }
-}
-
-// GeneralCategoryProperty -> "General_Category=" CategoryName
-public readonly ref struct GeneralCategoryProperty : IRule
-{
-    private readonly Input input;
-    private readonly Input parentInput;
-    private readonly Byte parentKind;
-    private readonly Int32 categoryNameStart;
-    public Int32 Length { get; }
-
-    public GeneralCategoryProperty(Input input, Input parentInput = default, Byte parentKind = 0)
-    {
-        this.input = input;
-        this.parentInput = parentInput;
-        this.parentKind = parentKind;
-        var pos = 0;
-        if (!input[pos..].StartsWith("General_Category="))
-            throw new ParseException(new ParseError());
-        pos += 17;
-        categoryNameStart = pos;
-        var categoryName = new CategoryName(input[pos..]);
-        pos += categoryName.Length;
-        Length = pos;
-    }
-
-    public CategoryName CategoryName => new(input[categoryNameStart..]);
-    public Input Text => input[..Length];
-
-    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
-    {
-        visitor.Visit(new CategoryName(input[categoryNameStart..], input, 34));
-    }
-
-    public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
-    {
-        Rules.Visit(parentKind, parentInput, ref visitor);
-    }
-
-}
-
-// BinaryProperty
-//     "Alpha"
-//     "Alphabetic"
-//     "Upper"
-//     "Uppercase"
-//     "Lower"
-//     "Lowercase"
-//     "White_Space"
-public readonly ref struct BinaryProperty : IRule
-{
-    private readonly Input input;
-    private readonly Input parentInput;
-    private readonly Byte parentKind;
-    public Int32 Length { get; }
-
-    public BinaryProperty(Input input, Input parentInput = default, Byte parentKind = 0)
-    {
-        this.input = input;
-        this.parentInput = parentInput;
-        this.parentKind = parentKind;
-        if (input.Length >= 11 && input[..11] is "White_Space")
-        {
-            Length = 11;
-            return;
-        }
-        if (input.Length >= 10 && input[..10] is "Alphabetic")
-        {
-            Length = 10;
-            return;
-        }
-        if (input.Length >= 9 && input[..9] is "Uppercase" or "Lowercase")
-        {
-            Length = 9;
-            return;
-        }
-        if (input.Length >= 5 && input[..5] is "Alpha" or "Upper" or "Lower")
-        {
-            Length = 5;
-            return;
-        }
-        throw new ParseException(new ParseError());
-    }
-
-    public Input Text => input[..Length];
-
-    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }
-
-    public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
-    {
-        Rules.Visit(parentKind, parentInput, ref visitor);
-    }
-}
-
-// PropertyName
-//     GeneralCategoryProperty
-//     CategoryName
-//     BinaryProperty
+// PropertyName -> [A-Za-z_] [A-Za-z_0-9=]
 public readonly ref struct PropertyName : IRule
 {
     private readonly Input input;
     private readonly Input parentInput;
     private readonly Byte parentKind;
-    private readonly Byte index;
     public Int32 Length { get; }
 
     public PropertyName(Input input, Input parentInput = default, Byte parentKind = 0)
@@ -2098,66 +1390,29 @@ public readonly ref struct PropertyName : IRule
         this.input = input;
         this.parentInput = parentInput;
         this.parentKind = parentKind;
-        if (input.StartsWith("General_Category="))
-        {
-            var generalCategoryProperty = new GeneralCategoryProperty(input);
-            index = 1;
-            Length = generalCategoryProperty.Length;
-        }
-        else
-        {
-            try
-            {
-                var categoryName = new CategoryName(input);
-                index = 2;
-                Length = categoryName.Length;
-            }
-            catch (ParseException)
-            {
-                var binaryProperty = new BinaryProperty(input);
-                index = 3;
-                Length = binaryProperty.Length;
-            }
-        }
+        var i = 0;
+        if (i >= input.Length || !IsAToZAToZ5FChar(input[i]))
+            throw new ParseException(new ParseError());
+        i++;
+        while (i < input.Length && IsAToZAToZ5F0To93DChar(input[i]))
+            i++;
+        Length = i;
     }
 
     public Input Text => input[..Length];
 
-    public void VisitChildren<T>(ref T visitor) where T : SfParser.IVisitor, allows ref struct
-    {
-        switch (index)
-        {
-            case 1: visitor.Visit(new GeneralCategoryProperty(input, input, 36)); break;
-            case 2: visitor.Visit(new CategoryName(input, input, 36)); break;
-            case 3: visitor.Visit(new BinaryProperty(input, input, 36)); break;
-        }
-    }
+    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }
 
-    public void Visit<T>(T visitor) where T : IVisitor
-    {
-        switch (index)
-        {
-            case 0: throw new UninitializedInstanceException();
-            case 1: visitor.Visit(new GeneralCategoryProperty(input)); break;
-            case 2: visitor.Visit(new CategoryName(input)); break;
-            case 3: visitor.Visit(new BinaryProperty(input)); break;
-            case Byte.MaxValue: visitor.Visit(new ParseError()); break;
-            default: throw new ArgumentOutOfRangeException(nameof(index));
-        }
-    }
-
-    public void VisitParent<T>(ref T visitor) where T : SfParser.IVisitor, allows ref struct
+    public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
     {
         Rules.Visit(parentKind, parentInput, ref visitor);
     }
 
-    public interface IVisitor
-    {
-        void Visit(in ParseError parseError);
-        void Visit(in GeneralCategoryProperty generalCategoryProperty);
-        void Visit(in CategoryName categoryName);
-        void Visit(in BinaryProperty binaryProperty);
-    }
+    private static Boolean IsAToZAToZ5FChar(Char c) =>
+        (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_';
+
+    private static Boolean IsAToZAToZ5F0To93DChar(Char c) =>
+        (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_' || (c >= '0' && c <= '9') || c == '=';
 }
 
 // UnicodePropertyClass -> '\\' 'p' '{' PropertyName '}'
@@ -2198,7 +1453,7 @@ public readonly ref struct UnicodePropertyClass : IRule
 
     public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
     {
-        visitor.Visit(new PropertyName(input[propertyNameStart..], input, 37));
+        visitor.Visit(new PropertyName(input[propertyNameStart..], input, 27));
     }
 
     public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
@@ -2234,7 +1489,7 @@ public readonly ref struct SingleClassChar : IRule
 
     public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
     {
-        visitor.Visit(new ClassChar(input[classCharStart..], input, 38));
+        visitor.Visit(new ClassChar(input[classCharStart..], input, 28));
     }
 
     public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
@@ -2299,10 +1554,10 @@ public readonly ref struct ClassRange : IRule
     {
         switch (index)
         {
-            case 1: visitor.Visit(new CharRange(input, input, 39)); break;
-            case 2: visitor.Visit(new ShorthandClass(input, input, 39)); break;
-            case 3: visitor.Visit(new UnicodePropertyClass(input, input, 39)); break;
-            case 4: visitor.Visit(new SingleClassChar(input, input, 39)); break;
+            case 1: visitor.Visit(new CharRange(input, input, 29)); break;
+            case 2: visitor.Visit(new ShorthandClass(input, input, 29)); break;
+            case 3: visitor.Visit(new UnicodePropertyClass(input, input, 29)); break;
+            case 4: visitor.Visit(new SingleClassChar(input, input, 29)); break;
         }
     }
 
@@ -2383,7 +1638,7 @@ public readonly ref struct BracketedClass : IRule
         {
             try
             {
-                var nextClassRange = new ClassRange(input[pos..], input, 40);
+                var nextClassRange = new ClassRange(input[pos..], input, 30);
                 visitor.Visit(nextClassRange);
                 pos += nextClassRange.Length;
             }
@@ -2437,8 +1692,8 @@ public readonly ref struct Class : IRule
     {
         switch (index)
         {
-            case 1: visitor.Visit(new BracketedClass(input, input, 41)); break;
-            case 2: visitor.Visit(new ClassRange(input, input, 41)); break;
+            case 1: visitor.Visit(new BracketedClass(input, input, 31)); break;
+            case 2: visitor.Visit(new ClassRange(input, input, 31)); break;
         }
     }
 
@@ -2533,11 +1788,11 @@ public readonly ref struct Atom : IRule
     {
         switch (index)
         {
-            case 1: visitor.Visit(new Group(input, input, 42)); break;
-            case 2: visitor.Visit(new RuleRef(input, input, 42)); break;
-            case 3: visitor.Visit(new StringLiteral(input, input, 42)); break;
-            case 4: visitor.Visit(new CharLiteral(input, input, 42)); break;
-            case 5: visitor.Visit(new Class(input, input, 42)); break;
+            case 1: visitor.Visit(new Group(input, input, 32)); break;
+            case 2: visitor.Visit(new RuleRef(input, input, 32)); break;
+            case 3: visitor.Visit(new StringLiteral(input, input, 32)); break;
+            case 4: visitor.Visit(new CharLiteral(input, input, 32)); break;
+            case 5: visitor.Visit(new Class(input, input, 32)); break;
         }
     }
 
@@ -2575,84 +1830,123 @@ public readonly ref struct Atom : IRule
 // ZeroOrOne -> '?'
 public readonly ref struct ZeroOrOne : IRule
 {
-    private readonly Input input;
     private readonly Input parentInput;
     private readonly Byte parentKind;
-    public Int32 Length { get; }
 
     public ZeroOrOne(Input input, Input parentInput = default, Byte parentKind = 0)
     {
-        this.input = input;
         this.parentInput = parentInput;
         this.parentKind = parentKind;
-        if (input.Length == 0 || input[0] != '?')
+        if (input.Length < 1 || input[..1] is not "?")
             throw new ParseException(new ParseError());
-        Length = 1;
+        Text = input[..1];
     }
 
-    public Input Text => input[..Length];
+    public Input Text { get; }
+    public Int32 Length => 1;
 
-    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }
+    public void VisitChildren<T>(ref T visitor) where T : SfParser.IVisitor, allows ref struct { }
 
-    public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
+    public void VisitParent<T>(ref T visitor) where T : SfParser.IVisitor, allows ref struct
     {
         Rules.Visit(parentKind, parentInput, ref visitor);
+    }
+
+    public static void Parse<T>(Input input, T visitor) where T : IVisitor
+    {
+        switch (input)
+        {
+            case "?": visitor.Visit(new ZeroOrOne(input)); break;
+            default: visitor.Visit(new ParseError()); break;
+        }
+    }
+
+    public interface IVisitor
+    {
+        void Visit(in ParseError parseError);
+        void Visit(in ZeroOrOne zeroOrOne);
     }
 }
 
 // ZeroOrMore -> '*'
 public readonly ref struct ZeroOrMore : IRule
 {
-    private readonly Input input;
     private readonly Input parentInput;
     private readonly Byte parentKind;
-    public Int32 Length { get; }
 
     public ZeroOrMore(Input input, Input parentInput = default, Byte parentKind = 0)
     {
-        this.input = input;
         this.parentInput = parentInput;
         this.parentKind = parentKind;
-        if (input.Length == 0 || input[0] != '*')
+        if (input.Length < 1 || input[..1] is not "*")
             throw new ParseException(new ParseError());
-        Length = 1;
+        Text = input[..1];
     }
 
-    public Input Text => input[..Length];
+    public Input Text { get; }
+    public Int32 Length => 1;
 
-    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }
+    public void VisitChildren<T>(ref T visitor) where T : SfParser.IVisitor, allows ref struct { }
 
-    public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
+    public void VisitParent<T>(ref T visitor) where T : SfParser.IVisitor, allows ref struct
     {
         Rules.Visit(parentKind, parentInput, ref visitor);
+    }
+
+    public static void Parse<T>(Input input, T visitor) where T : IVisitor
+    {
+        switch (input)
+        {
+            case "*": visitor.Visit(new ZeroOrMore(input)); break;
+            default: visitor.Visit(new ParseError()); break;
+        }
+    }
+
+    public interface IVisitor
+    {
+        void Visit(in ParseError parseError);
+        void Visit(in ZeroOrMore zeroOrMore);
     }
 }
 
 // OneOrMore -> '+'
 public readonly ref struct OneOrMore : IRule
 {
-    private readonly Input input;
     private readonly Input parentInput;
     private readonly Byte parentKind;
-    public Int32 Length { get; }
 
     public OneOrMore(Input input, Input parentInput = default, Byte parentKind = 0)
     {
-        this.input = input;
         this.parentInput = parentInput;
         this.parentKind = parentKind;
-        if (input.Length == 0 || input[0] != '+')
+        if (input.Length < 1 || input[..1] is not "+")
             throw new ParseException(new ParseError());
-        Length = 1;
+        Text = input[..1];
     }
 
-    public Input Text => input[..Length];
+    public Input Text { get; }
+    public Int32 Length => 1;
 
-    public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }
+    public void VisitChildren<T>(ref T visitor) where T : SfParser.IVisitor, allows ref struct { }
 
-    public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
+    public void VisitParent<T>(ref T visitor) where T : SfParser.IVisitor, allows ref struct
     {
         Rules.Visit(parentKind, parentInput, ref visitor);
+    }
+
+    public static void Parse<T>(Input input, T visitor) where T : IVisitor
+    {
+        switch (input)
+        {
+            case "+": visitor.Visit(new OneOrMore(input)); break;
+            default: visitor.Visit(new ParseError()); break;
+        }
+    }
+
+    public interface IVisitor
+    {
+        void Visit(in ParseError parseError);
+        void Visit(in OneOrMore oneOrMore);
     }
 }
 
@@ -2688,7 +1982,7 @@ public readonly ref struct Exactly : IRule
 
     public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
     {
-        visitor.Visit(new Number(input[numberStart..], input, 46));
+        visitor.Visit(new Number(input[numberStart..], input, 36));
     }
 
     public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
@@ -2733,7 +2027,7 @@ public readonly ref struct AtLeast : IRule
 
     public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
     {
-        visitor.Visit(new Number(input[numberStart..], input, 47));
+        visitor.Visit(new Number(input[numberStart..], input, 37));
     }
 
     public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
@@ -2783,8 +2077,8 @@ public readonly ref struct Between : IRule
 
     public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
     {
-        visitor.Visit(new Number(input[leftStart..], input, 48));
-        visitor.Visit(new Number(input[rightStart..], input, 48));
+        visitor.Visit(new Number(input[leftStart..], input, 38));
+        visitor.Visit(new Number(input[rightStart..], input, 38));
     }
 
     public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
@@ -2870,12 +2164,12 @@ public readonly ref struct Quantifier : IRule
     {
         switch (index)
         {
-            case 1: visitor.Visit(new ZeroOrOne(input, input, 49)); break;
-            case 2: visitor.Visit(new ZeroOrMore(input, input, 49)); break;
-            case 3: visitor.Visit(new OneOrMore(input, input, 49)); break;
-            case 4: visitor.Visit(new Exactly(input, input, 49)); break;
-            case 5: visitor.Visit(new AtLeast(input, input, 49)); break;
-            case 6: visitor.Visit(new Between(input, input, 49)); break;
+            case 1: visitor.Visit(new ZeroOrOne(input, input, 39)); break;
+            case 2: visitor.Visit(new ZeroOrMore(input, input, 39)); break;
+            case 3: visitor.Visit(new OneOrMore(input, input, 39)); break;
+            case 4: visitor.Visit(new Exactly(input, input, 39)); break;
+            case 5: visitor.Visit(new AtLeast(input, input, 39)); break;
+            case 6: visitor.Visit(new Between(input, input, 39)); break;
         }
     }
 
@@ -2947,10 +2241,10 @@ public readonly ref struct Item : IRule
 
     public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
     {
-        visitor.Visit(new Atom(input[atomStart..], input, 50));
+        visitor.Visit(new Atom(input[atomStart..], input, 40));
         try
         {
-            visitor.Visit(new Quantifier(input[quantifierStart..], input, 50));
+            visitor.Visit(new Quantifier(input[quantifierStart..], input, 40));
         }
         catch (ParseException) { }
     }
@@ -2994,7 +2288,7 @@ public readonly ref struct Alternative : IRule
 
     public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
     {
-        var item = new Item(input[itemStart..], input, 51);
+        var item = new Item(input[itemStart..], input, 41);
         visitor.Visit(item);
         var pos = itemStart + item.Length;
         while (pos < Length)
@@ -3003,7 +2297,7 @@ public readonly ref struct Alternative : IRule
             {
                 if (pos >= input.Length || input[pos] != ' ') break;
                 pos += 1;
-                var nextItem = new Item(input[pos..], input, 51);
+                var nextItem = new Item(input[pos..], input, 41);
                 visitor.Visit(nextItem);
                 pos += nextItem.Length;
             }
@@ -3056,7 +2350,7 @@ public readonly ref struct InlineAlternatives : IRule
 
     public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
     {
-        visitor.Visit(new Alternative(input[alternativeStart..], input, 52));
+        visitor.Visit(new Alternative(input[alternativeStart..], input, 42));
     }
 
     public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
@@ -3081,18 +2375,17 @@ public readonly ref struct Indentation : IRule
         this.input = input;
         this.parentInput = parentInput;
         this.parentKind = parentKind;
-        if (input.Length > 0 && input[0] == '\t')
+        if (input.Length >= 4 && input[..4] is "    ")
         {
-            if (input.Length == 0 || input[0] != '\t')
-                throw new ParseException(new ParseError());
-            Length = 1;
-        }
-        else
-        {
-            if (!input.StartsWith("    "))
-                throw new ParseException(new ParseError());
             Length = 4;
+            return;
         }
+        if (input.Length >= 1 && input[..1] is "\t")
+        {
+            Length = 1;
+            return;
+        }
+        throw new ParseException(new ParseError());
     }
 
     public Input Text => input[..Length];
@@ -3139,8 +2432,8 @@ public readonly ref struct IndentedAlternative : IRule
 
     public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
     {
-        visitor.Visit(new Indentation(input[indentationStart..], input, 54));
-        visitor.Visit(new Alternative(input[alternativeStart..], input, 54));
+        visitor.Visit(new Indentation(input[indentationStart..], input, 44));
+        visitor.Visit(new Alternative(input[alternativeStart..], input, 44));
     }
 
     public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
@@ -3190,7 +2483,7 @@ public readonly ref struct IndentedAlternatives : IRule
         {
             try
             {
-                var nextIndentedAlternative = new IndentedAlternative(input[pos..], input, 55);
+                var nextIndentedAlternative = new IndentedAlternative(input[pos..], input, 45);
                 visitor.Visit(nextIndentedAlternative);
                 pos += nextIndentedAlternative.Length;
             }
@@ -3243,8 +2536,8 @@ public readonly ref struct Alternatives : IRule
     {
         switch (index)
         {
-            case 1: visitor.Visit(new InlineAlternatives(input, input, 56)); break;
-            case 2: visitor.Visit(new IndentedAlternatives(input, input, 56)); break;
+            case 1: visitor.Visit(new InlineAlternatives(input, input, 46)); break;
+            case 2: visitor.Visit(new IndentedAlternatives(input, input, 46)); break;
         }
     }
 
@@ -3304,8 +2597,8 @@ public readonly ref struct Rule : IRule
 
     public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
     {
-        visitor.Visit(new Name(input[nameStart..], input, 57));
-        visitor.Visit(new Alternatives(input[alternativesStart..], input, 57));
+        visitor.Visit(new Name(input[nameStart..], input, 47));
+        visitor.Visit(new Alternatives(input[alternativesStart..], input, 47));
     }
 
     public void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct
@@ -3338,14 +2631,12 @@ public readonly ref struct Grammar : IRule
             var savedPos = pos;
             try
             {
-                if (pos >= input.Length || input[pos] != '\n')
+                if (!input[pos..].StartsWith("\n"))
                     throw new ParseException(new ParseError());
                 pos += 1;
-                if (pos >= input.Length || input[pos] != '\n')
+                if (!input[pos..].StartsWith("\n"))
                     throw new ParseException(new ParseError());
                 pos += 1;
-                while (pos < input.Length && input[pos] == '\n')
-                    pos += 1;
                 var nextRule = new Rule(input[pos..]);
                 pos += nextRule.Length;
             }
@@ -3363,7 +2654,7 @@ public readonly ref struct Grammar : IRule
 
     public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct
     {
-        var rule = new Rule(input[ruleStart..], input, 58);
+        var rule = new Rule(input[ruleStart..], input, 48);
         visitor.Visit(rule);
         var pos = ruleStart + rule.Length;
         while (pos < Length)
@@ -3376,7 +2667,7 @@ public readonly ref struct Grammar : IRule
                 pos += 1;
                 while (pos < input.Length && input[pos] == '\n')
                     pos += 1;
-                var nextRule = new Rule(input[pos..], input, 58);
+                var nextRule = new Rule(input[pos..], input, 48);
                 visitor.Visit(nextRule);
                 pos += nextRule.Length;
             }
@@ -3423,39 +2714,29 @@ public static class Rules
             case 23: visitor.Visit(new ClassChar(input)); break;
             case 24: visitor.Visit(new CharRange(input)); break;
             case 25: visitor.Visit(new ShorthandClass(input)); break;
-            case 26: visitor.Visit(new LetterCategory(input)); break;
-            case 27: visitor.Visit(new MarkCategory(input)); break;
-            case 28: visitor.Visit(new NumberCategory(input)); break;
-            case 29: visitor.Visit(new PunctuationCategory(input)); break;
-            case 30: visitor.Visit(new SymbolCategory(input)); break;
-            case 31: visitor.Visit(new SeparatorCategory(input)); break;
-            case 32: visitor.Visit(new OtherCategory(input)); break;
-            case 33: visitor.Visit(new CategoryName(input)); break;
-            case 34: visitor.Visit(new GeneralCategoryProperty(input)); break;
-            case 35: visitor.Visit(new BinaryProperty(input)); break;
-            case 36: visitor.Visit(new PropertyName(input)); break;
-            case 37: visitor.Visit(new UnicodePropertyClass(input)); break;
-            case 38: visitor.Visit(new SingleClassChar(input)); break;
-            case 39: visitor.Visit(new ClassRange(input)); break;
-            case 40: visitor.Visit(new BracketedClass(input)); break;
-            case 41: visitor.Visit(new Class(input)); break;
-            case 42: visitor.Visit(new Atom(input)); break;
-            case 43: visitor.Visit(new ZeroOrOne(input)); break;
-            case 44: visitor.Visit(new ZeroOrMore(input)); break;
-            case 45: visitor.Visit(new OneOrMore(input)); break;
-            case 46: visitor.Visit(new Exactly(input)); break;
-            case 47: visitor.Visit(new AtLeast(input)); break;
-            case 48: visitor.Visit(new Between(input)); break;
-            case 49: visitor.Visit(new Quantifier(input)); break;
-            case 50: visitor.Visit(new Item(input)); break;
-            case 51: visitor.Visit(new Alternative(input)); break;
-            case 52: visitor.Visit(new InlineAlternatives(input)); break;
-            case 53: visitor.Visit(new Indentation(input)); break;
-            case 54: visitor.Visit(new IndentedAlternative(input)); break;
-            case 55: visitor.Visit(new IndentedAlternatives(input)); break;
-            case 56: visitor.Visit(new Alternatives(input)); break;
-            case 57: visitor.Visit(new Rule(input)); break;
-            case 58: visitor.Visit(new Grammar(input)); break;
+            case 26: visitor.Visit(new PropertyName(input)); break;
+            case 27: visitor.Visit(new UnicodePropertyClass(input)); break;
+            case 28: visitor.Visit(new SingleClassChar(input)); break;
+            case 29: visitor.Visit(new ClassRange(input)); break;
+            case 30: visitor.Visit(new BracketedClass(input)); break;
+            case 31: visitor.Visit(new Class(input)); break;
+            case 32: visitor.Visit(new Atom(input)); break;
+            case 33: visitor.Visit(new ZeroOrOne(input)); break;
+            case 34: visitor.Visit(new ZeroOrMore(input)); break;
+            case 35: visitor.Visit(new OneOrMore(input)); break;
+            case 36: visitor.Visit(new Exactly(input)); break;
+            case 37: visitor.Visit(new AtLeast(input)); break;
+            case 38: visitor.Visit(new Between(input)); break;
+            case 39: visitor.Visit(new Quantifier(input)); break;
+            case 40: visitor.Visit(new Item(input)); break;
+            case 41: visitor.Visit(new Alternative(input)); break;
+            case 42: visitor.Visit(new InlineAlternatives(input)); break;
+            case 43: visitor.Visit(new Indentation(input)); break;
+            case 44: visitor.Visit(new IndentedAlternative(input)); break;
+            case 45: visitor.Visit(new IndentedAlternatives(input)); break;
+            case 46: visitor.Visit(new Alternatives(input)); break;
+            case 47: visitor.Visit(new Rule(input)); break;
+            case 48: visitor.Visit(new Grammar(input)); break;
         }
     }
 }
