@@ -12,4 +12,8 @@
       </None>
     </ItemGroup>
 
+    <ItemGroup>
+      <PackageReference Include="EqCmp" Version="1.0.0-beta4" />
+    </ItemGroup>
+
 </Project>
