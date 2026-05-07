@@ -133,10 +133,7 @@ public static class SfGrammarBuilder
             var raw = new String(charLiteral.Text);
             var content = raw[1..^1];
             var unescaped = Unescape(content);
-            if (unescaped.Length == 1)
-                astAlt.Items.Add(new Literal<Char> { Value = unescaped[0], Quantifier = quantifier });
-            else
-                astAlt.Items.Add(new Literal<String> { Value = unescaped, Quantifier = quantifier });
+            astAlt.Items.Add(new Literal<String> { Value = unescaped, Quantifier = quantifier });
         }
 
         public void Visit(in SfParser.Class @class)

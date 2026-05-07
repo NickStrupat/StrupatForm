@@ -144,7 +144,6 @@ public static class CodeEmitter
         return firstItem switch
         {
             Literal<String> ls => ls.Value,
-            Literal<Char> lc => lc.Value.ToString(),
             RuleRef rr => ComputeFirstToken(rr.Rule, visited),
             _ => null
         };
@@ -241,8 +240,8 @@ public static class CodeEmitter
     static String ItemToString(Item item) => item switch
     {
         RuleRef rr => rr.Name + QuantifierSuffix(rr.Quantifier),
+        Literal<String> { Value.Length: 1 } lc => $"'{EscapeChar(lc.Value[0])}'",
         Literal<String> ls => $"\"{ls.Value}\"",
-        Literal<Char> lc => $"'{EscapeChar(lc.Value)}'",
         Class c => ClassToString(c),
         Alternative a => "(" + String.Join(" ", a.Items.Select(ItemToString)) + ")" + QuantifierSuffix(a.Quantifier),
         _ => "?"
@@ -469,8 +468,6 @@ public static class CodeEmitter
     static String GetLeadingCondition(Alternative alt)
     {
         var first = alt.Items[0];
-        if (first is Literal<Char> lc)
-            return $"input.Length > 0 && input[0] == '{EscapeChar(lc.Value)}'";
         if (first is Literal<String> ls)
         {
             if (ls.Value.Length > 1)
@@ -507,24 +504,24 @@ public static class CodeEmitter
         w.Line("var i = 0;");
         foreach (var item in items)
         {
-            if (item is Literal<Char> lc)
+            if (item is Literal<String> ls)
             {
-                if (lc.Quantifier is { Min: 1, Max: 1 })
+                if (ls.Value.Length == 1 && ls.Quantifier is { Min: 1, Max: 1 })
                 {
-                    w.Line($"if (i >= input.Length || input[i] != '{EscapeChar(lc.Value)}')");
+                    w.Line($"if (i >= input.Length || input[i] != '{EscapeChar(ls.Value[0])}')");
                     w.PushIndent();
                     w.Line("throw new ParseException(new ParseError());");
                     w.PopIndent();
                     w.Line("i++;");
                 }
-            }
-            else if (item is Literal<String> ls)
-            {
-                w.Line($"if (!input[i..].StartsWith(\"{EscapeString(ls.Value)}\"))");
-                w.PushIndent();
-                w.Line("throw new ParseException(new ParseError());");
-                w.PopIndent();
-                w.Line($"i += {ls.Value.Length};");
+                else if (ls.Value.Length > 1)
+                {
+                    w.Line($"if (!input[i..].StartsWith(\"{EscapeString(ls.Value)}\"))");
+                    w.PushIndent();
+                    w.Line("throw new ParseException(new ParseError());");
+                    w.PopIndent();
+                    w.Line($"i += {ls.Value.Length};");
+                }
             }
             else if (item is Class c)
             {
@@ -564,15 +561,15 @@ public static class CodeEmitter
 
     static Boolean IsDelimitedPattern(List<Item> items) =>
         items.Count == 3 &&
-        items[0] is Literal<Char> open &&
+        items[0] is Literal<String> { Value.Length: 1 } open &&
         items[1] is Class { Negated: true } &&
-        items[2] is Literal<Char> close &&
+        items[2] is Literal<String> { Value.Length: 1 } close &&
         open.Value == close.Value;
 
     static void EmitDelimitedPattern(List<Item> items, EmitContext ctx)
     {
         var w = ctx.W;
-        var delim = ((Literal<Char>)items[0]).Value;
+        var delim = ((Literal<String>)items[0]).Value[0];
         w.Line($"var end = input[1..].IndexOf('{EscapeChar(delim)}');");
         w.Line("if (end < 0)");
         w.PushIndent();
@@ -584,21 +581,24 @@ public static class CodeEmitter
     static void EmitSingleItemTerminal(Item item, EmitContext ctx)
     {
         var w = ctx.W;
-        if (item is Literal<Char> lc)
+        if (item is Literal<String> ls)
         {
-            w.Line($"if (input.Length == 0 || input[0] != '{EscapeChar(lc.Value)}')");
-            w.PushIndent();
-            w.Line("throw new ParseException(new ParseError());");
-            w.PopIndent();
-            w.Line("Length = 1;");
-        }
-        else if (item is Literal<String> ls)
-        {
-            w.Line($"if (!input.StartsWith(\"{EscapeString(ls.Value)}\"))");
-            w.PushIndent();
-            w.Line("throw new ParseException(new ParseError());");
-            w.PopIndent();
-            w.Line($"Length = {ls.Value.Length};");
+            if (ls.Value.Length == 1)
+            {
+                w.Line($"if (input.Length == 0 || input[0] != '{EscapeChar(ls.Value[0])}')");
+                w.PushIndent();
+                w.Line("throw new ParseException(new ParseError());");
+                w.PopIndent();
+                w.Line("Length = 1;");
+            }
+            else
+            {
+                w.Line($"if (!input.StartsWith(\"{EscapeString(ls.Value)}\"))");
+                w.PushIndent();
+                w.Line("throw new ParseException(new ParseError());");
+                w.PopIndent();
+                w.Line($"Length = {ls.Value.Length};");
+            }
         }
         else if (item is Class c)
         {
@@ -885,32 +885,32 @@ public static class CodeEmitter
             var item = items[i];
             var isLast = i == items.Count - 1;
 
-            if (item is Literal<String> ls)
-            {
-                w.Line($"if (!input[pos..].StartsWith(\"{EscapeString(ls.Value)}\"))");
-                w.PushIndent();
-                w.Line("throw new ParseException(new ParseError());");
-                w.PopIndent();
-                w.Line($"pos += {ls.Value.Length};");
-                if (!isLast) EmitSkipWs(ctx);
-            }
-            else if (item is Literal<Char> lc)
+            if (item is Literal<String> { Value.Length: 1 } lc)
             {
                 if (lc.Quantifier is { Min: 0, Max: 1 })
                 {
-                    w.Line($"if (pos < input.Length && input[pos] == '{EscapeChar(lc.Value)}')");
+                    w.Line($"if (pos < input.Length && input[pos] == '{EscapeChar(lc.Value[0])}')");
                     w.PushIndent();
                     w.Line("pos += 1;");
                     w.PopIndent();
                 }
                 else
                 {
-                    w.Line($"if (pos >= input.Length || input[pos] != '{EscapeChar(lc.Value)}')");
+                    w.Line($"if (pos >= input.Length || input[pos] != '{EscapeChar(lc.Value[0])}')");
                     w.PushIndent();
                     w.Line("throw new ParseException(new ParseError());");
                     w.PopIndent();
                     w.Line("pos += 1;");
                 }
+                if (!isLast) EmitSkipWs(ctx);
+            }
+            else if (item is Literal<String> ls)
+            {
+                w.Line($"if (!input[pos..].StartsWith(\"{EscapeString(ls.Value)}\"))");
+                w.PushIndent();
+                w.Line("throw new ParseException(new ParseError());");
+                w.PopIndent();
+                w.Line($"pos += {ls.Value.Length};");
                 if (!isLast) EmitSkipWs(ctx);
             }
             else if (item is RuleRef rr)
@@ -1050,13 +1050,13 @@ public static class CodeEmitter
                         w.Line($"pos += next{subRr.Name}.Length;");
                         EmitSkipWs(ctx);
                     }
-                    else if (subItem is Literal<Char> subLc)
+                    else if (subItem is Literal<String> { Value.Length: 1 } subLc)
                     {
-                        w.Line($"if (pos >= input.Length || input[pos] != '{EscapeChar(subLc.Value)}') break;");
+                        w.Line($"if (pos >= input.Length || input[pos] != '{EscapeChar(subLc.Value[0])}') break;");
                         w.Line("pos += 1;");
                         if (subLc.Quantifier is { Max: null })
                         {
-                            w.Line($"while (pos < input.Length && input[pos] == '{EscapeChar(subLc.Value)}')");
+                            w.Line($"while (pos < input.Length && input[pos] == '{EscapeChar(subLc.Value[0])}')");
                             w.PushIndent();
                             w.Line("pos += 1;");
                             w.PopIndent();
@@ -1082,9 +1082,9 @@ public static class CodeEmitter
         var w = ctx.W;
         var items = subAlt.Items;
 
-        if (items.Count == 2 && items[0] is Literal<Char> lc && items[1] is RuleRef singleRr)
+        if (items.Count == 2 && items[0] is Literal<String> { Value.Length: 1 } lc && items[1] is RuleRef singleRr)
         {
-            w.Line($"while (pos < input.Length && input[pos] == '{EscapeChar(lc.Value)}')");
+            w.Line($"while (pos < input.Length && input[pos] == '{EscapeChar(lc.Value[0])}')");
             w.Line("{");
             w.PushIndent();
             w.Line("pos += 1;");
@@ -1121,17 +1121,17 @@ public static class CodeEmitter
                 w.Line($"pos += {ls.Value.Length};");
                 EmitSkipWs(ctx);
             }
-            else if (item is Literal<Char> litC)
+            else if (item is Literal<String> { Value.Length: 1 } litC)
             {
                 var q = litC.Quantifier;
-                w.Line($"if (pos >= input.Length || input[pos] != '{EscapeChar(litC.Value)}')");
+                w.Line($"if (pos >= input.Length || input[pos] != '{EscapeChar(litC.Value[0])}')");
                 w.PushIndent();
                 w.Line("throw new ParseException(new ParseError());");
                 w.PopIndent();
                 w.Line("pos += 1;");
                 if (q is { Max: null })
                 {
-                    w.Line($"while (pos < input.Length && input[pos] == '{EscapeChar(litC.Value)}')");
+                    w.Line($"while (pos < input.Length && input[pos] == '{EscapeChar(litC.Value[0])}')");
                     w.PushIndent();
                     w.Line("pos += 1;");
                     w.PopIndent();

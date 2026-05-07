@@ -50,8 +50,8 @@ public class SfGrammarBuilderTests
         var rule = grammar.Rules.Values.First();
         var items = rule.Alternatives[0].Items;
         items.Should().HaveCount(1);
-        items[0].Should().BeOfType<Literal<Char>>();
-        ((Literal<Char>)items[0]).Value.Should().Be(',');
+        items[0].Should().BeOfType<Literal<String>>();
+        ((Literal<String>)items[0]).Value.Should().Be(",");
     }
 
     [Fact]
@@ -60,8 +60,8 @@ public class SfGrammarBuilderTests
         var grammar = SfGrammarBuilder.Parse("Newline -> '\\n'");
         var rule = grammar.Rules.Values.First();
         var items = rule.Alternatives[0].Items;
-        items[0].Should().BeOfType<Literal<Char>>();
-        ((Literal<Char>)items[0]).Value.Should().Be('\n');
+        items[0].Should().BeOfType<Literal<String>>();
+        ((Literal<String>)items[0]).Value.Should().Be("\n");
     }
 
     [Fact]
@@ -177,8 +177,8 @@ public class SfGrammarBuilderTests
         var grammar = SfGrammarBuilder.Parse("A -> '\\u0041'");
         var rule = grammar.Rules.Values.First();
         var items = rule.Alternatives[0].Items;
-        items[0].Should().BeOfType<Literal<Char>>();
-        ((Literal<Char>)items[0]).Value.Should().Be('A');
+        items[0].Should().BeOfType<Literal<String>>();
+        ((Literal<String>)items[0]).Value.Should().Be("A");
     }
 
     [Fact]
@@ -187,8 +187,8 @@ public class SfGrammarBuilderTests
         var grammar = SfGrammarBuilder.Parse("A -> '\\U00000041'");
         var rule = grammar.Rules.Values.First();
         var items = rule.Alternatives[0].Items;
-        items[0].Should().BeOfType<Literal<Char>>();
-        ((Literal<Char>)items[0]).Value.Should().Be('A');
+        items[0].Should().BeOfType<Literal<String>>();
+        ((Literal<String>)items[0]).Value.Should().Be("A");
     }
 
     [Fact]
@@ -197,8 +197,8 @@ public class SfGrammarBuilderTests
         var grammar = SfGrammarBuilder.Parse("A -> '\\x{41}'");
         var rule = grammar.Rules.Values.First();
         var items = rule.Alternatives[0].Items;
-        items[0].Should().BeOfType<Literal<Char>>();
-        ((Literal<Char>)items[0]).Value.Should().Be('A');
+        items[0].Should().BeOfType<Literal<String>>();
+        ((Literal<String>)items[0]).Value.Should().Be("A");
     }
 
     [Fact]
