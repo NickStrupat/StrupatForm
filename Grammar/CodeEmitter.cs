@@ -178,36 +178,31 @@ public static class CodeEmitter
 
     static void EmitPrologue(EmitContext ctx)
     {
-        var w = ctx.W;
-        w.Line("using Input = System.ReadOnlySpan<System.Char>;");
-        w.Blank();
-        w.Line($"namespace {ctx.Namespace};");
-        w.Blank();
-        w.Line("public readonly struct ParseError;");
-        w.Line("public sealed class ParseException(ParseError error) : Exception");
-        w.Line("{");
-        w.PushIndent();
-        w.Line("public ParseError Error { get; } = error;");
-        w.PopIndent();
-        w.Line("}");
-        w.Blank();
-        w.Line("public sealed class UninitializedInstanceException() : Exception(\"Instance uninitialized\");");
-        w.Blank();
-        w.Line("public interface IRule");
-        w.Line("{");
-        w.PushIndent();
-        w.Line("Input Text { get; }");
-        w.Line("void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct;");
-        w.Line("void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct;");
-        w.PopIndent();
-        w.Line("}");
-        w.Blank();
-        w.Line("public interface IVisitor");
-        w.Line("{");
-        w.PushIndent();
-        w.Line("void Visit<T>(in T rule) where T : IRule, allows ref struct;");
-        w.PopIndent();
-        w.Line("}");
+        ctx.W.Lines($$"""
+            using Input = System.ReadOnlySpan<System.Char>;
+
+            namespace {{ctx.Namespace}};
+
+            public readonly struct ParseError;
+            public sealed class ParseException(ParseError error) : Exception
+            {
+                public ParseError Error { get; } = error;
+            }
+
+            public sealed class UninitializedInstanceException() : Exception("Instance uninitialized");
+
+            public interface IRule
+            {
+                Input Text { get; }
+                void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct;
+                void VisitParent<T>(ref T visitor) where T : IVisitor, allows ref struct;
+            }
+
+            public interface IVisitor
+            {
+                void Visit<T>(in T rule) where T : IRule, allows ref struct;
+            }
+            """);
     }
 
     // --- Rule comment ---
@@ -310,15 +305,21 @@ public static class CodeEmitter
         w.Line($"public readonly ref struct {rule.Name} : IRule");
         w.Line("{");
         w.PushIndent();
-        w.Line("private readonly Input input;");
-        EmitParentFields(ctx);
-        w.Line("public Int32 Length { get; }");
+        w.Lines("""
+            private readonly Input input;
+            private readonly Input parentInput;
+            private readonly Byte parentKind;
+            public Int32 Length { get; }
+            """);
         w.Blank();
         w.Line($"public {rule.Name}({ConstructorParams()})");
         w.Line("{");
         w.PushIndent();
-        w.Line("this.input = input;");
-        EmitParentAssignment(ctx);
+        w.Lines("""
+            this.input = input;
+            this.parentInput = parentInput;
+            this.parentKind = parentKind;
+            """);
         foreach (var group in grouped)
         {
             var len = group.Key;
@@ -335,9 +336,11 @@ public static class CodeEmitter
         w.PopIndent();
         w.Line("}");
         w.Blank();
-        w.Line("public Input Text => input[..Length];");
-        w.Blank();
-        w.Line("public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }");
+        w.Lines("""
+            public Input Text => input[..Length];
+
+            public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }
+            """);
         w.Blank();
         EmitVisitParent(ctx);
         w.PopIndent();
@@ -349,51 +352,48 @@ public static class CodeEmitter
         var w = ctx.W;
         var ns = ctx.Namespace;
         var literal = ((Literal<String>)rule.Alternatives[0].Items[0]).Value;
+        var escaped = EscapeString(literal);
 
         w.Line($"public readonly ref struct {rule.Name} : IRule");
         w.Line("{");
         w.PushIndent();
-        EmitParentFields(ctx);
-        w.Blank();
-        w.Line($"public {rule.Name}({ConstructorParams()})");
-        w.Line("{");
-        w.PushIndent();
-        EmitParentAssignment(ctx);
-        w.Line($"if (input.Length < {literal.Length} || input[..{literal.Length}] is not \"{EscapeString(literal)}\")");
-        w.PushIndent();
-        w.Line("throw new ParseException(new ParseError());");
-        w.PopIndent();
-        w.Line($"Text = input[..{literal.Length}];");
-        w.PopIndent();
-        w.Line("}");
-        w.Blank();
-        w.Line("public Input Text { get; }");
-        w.Line($"public Int32 Length => {literal.Length};");
-        w.Blank();
-        w.Line($"public void VisitChildren<T>(ref T visitor) where T : {ns}.IVisitor, allows ref struct {{ }}");
+        w.Lines($$"""
+            private readonly Input parentInput;
+            private readonly Byte parentKind;
+
+            public {{rule.Name}}({{ConstructorParams()}})
+            {
+                this.parentInput = parentInput;
+                this.parentKind = parentKind;
+                if (input.Length < {{literal.Length}} || input[..{{literal.Length}}] is not "{{escaped}}")
+                    throw new ParseException(new ParseError());
+                Text = input[..{{literal.Length}}];
+            }
+
+            public Input Text { get; }
+            public Int32 Length => {{literal.Length}};
+
+            public void VisitChildren<T>(ref T visitor) where T : {{ns}}.IVisitor, allows ref struct { }
+            """);
         w.Blank();
         EmitVisitParent(ctx, qualifyIVisitor: true);
         w.Blank();
-        w.Line("public static void Parse<T>(Input input, T visitor) where T : IVisitor");
-        w.Line("{");
-        w.PushIndent();
-        w.Line("switch (input)");
-        w.Line("{");
-        w.PushIndent();
-        w.Line($"case \"{EscapeString(literal)}\": visitor.Visit(new {rule.Name}(input)); break;");
-        w.Line("default: visitor.Visit(new ParseError()); break;");
-        w.PopIndent();
-        w.Line("}");
-        w.PopIndent();
-        w.Line("}");
-        w.Blank();
-        w.Line("public interface IVisitor");
-        w.Line("{");
-        w.PushIndent();
-        w.Line("void Visit(in ParseError parseError);");
-        w.Line($"void Visit(in {rule.Name} {CamelCase(rule.Name)});");
-        w.PopIndent();
-        w.Line("}");
+        w.Lines($$"""
+            public static void Parse<T>(Input input, T visitor) where T : IVisitor
+            {
+                switch (input)
+                {
+                    case "{{escaped}}": visitor.Visit(new {{rule.Name}}(input)); break;
+                    default: visitor.Visit(new ParseError()); break;
+                }
+            }
+
+            public interface IVisitor
+            {
+                void Visit(in ParseError parseError);
+                void Visit(in {{rule.Name}} {{CamelCase(rule.Name)}});
+            }
+            """);
         w.PopIndent();
         w.Line("}");
     }
@@ -405,36 +405,38 @@ public static class CodeEmitter
         w.Line($"public readonly ref struct {rule.Name} : IRule");
         w.Line("{");
         w.PushIndent();
-        w.Line("private readonly Input input;");
-        EmitParentFields(ctx);
-        w.Line("public Int32 Length { get; }");
+        w.Lines("""
+            private readonly Input input;
+            private readonly Input parentInput;
+            private readonly Byte parentKind;
+            public Int32 Length { get; }
+            """);
         w.Blank();
         w.Line($"public {rule.Name}({ConstructorParams()})");
         w.Line("{");
         w.PushIndent();
-        w.Line("this.input = input;");
-        EmitParentAssignment(ctx);
+        w.Lines("""
+            this.input = input;
+            this.parentInput = parentInput;
+            this.parentKind = parentKind;
+            """);
 
         if (rule.Alternatives.Count == 1)
-        {
             EmitCharClassSingleAlternative(rule.Alternatives[0], rule, ctx);
-        }
         else
-        {
             EmitCharClassMultiAlternative(rule, ctx);
-        }
 
         w.PopIndent();
         w.Line("}");
         w.Blank();
-        w.Line("public Input Text => input[..Length];");
-        w.Blank();
-        w.Line("public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }");
+        w.Lines("""
+            public Input Text => input[..Length];
+
+            public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }
+            """);
         w.Blank();
         EmitVisitParent(ctx);
-
         EmitCharClassHelperMethods(rule, ctx);
-
         w.PopIndent();
         w.Line("}");
     }
@@ -1565,212 +1567,180 @@ public static class CodeEmitter
     static void EmitRepetitionEnumerable(RuleRef rr, EmitContext ctx)
     {
         var w = ctx.W;
-        w.Line($"// {rr.Name}{QuantifierSuffix(rr.Quantifier)} enumerable");
-        w.Line($"public readonly ref struct {rr.Name}Enumerable");
-        w.Line("{");
-        w.PushIndent();
-        w.Line("private readonly Input input;");
-        w.Blank();
-        w.Line($"public {rr.Name}Enumerable(Input input) => this.input = input;");
-        w.Blank();
-        w.Line("public Enumerator GetEnumerator() => new(input);");
-        w.Blank();
-        w.Line("public ref struct Enumerator");
-        w.Line("{");
-        w.PushIndent();
-        w.Line("private readonly Input input;");
-        w.Line("private Int32 consumed;");
-        w.Blank();
-        w.Line("public Enumerator(Input input) => this.input = input;");
-        w.Blank();
-        w.Line($"public {rr.Name} Current {{ get; private set; }}");
-        w.Blank();
-        w.Line("public Boolean MoveNext()");
-        w.Line("{");
-        w.PushIndent();
-        w.Line("var remaining = input[consumed..];");
-        if (!ctx.PreserveWhitespace)
-        {
-            w.Line("var ws = SkipWhitespace(remaining);");
-            w.Line("remaining = remaining[ws..];");
-        }
-        w.Line("if (remaining.IsEmpty)");
-        w.PushIndent();
-        w.Line("return false;");
-        w.PopIndent();
-        w.Line("try");
-        w.Line("{");
-        w.PushIndent();
-        w.Line($"Current = new {rr.Name}(remaining);");
-        if (!ctx.PreserveWhitespace)
-            w.Line("consumed += ws + Current.Length;");
-        else
-            w.Line("consumed += Current.Length;");
-        w.Line("return true;");
-        w.PopIndent();
-        w.Line("}");
-        w.Line("catch (ParseException)");
-        w.Line("{");
-        w.PushIndent();
-        w.Line("return false;");
-        w.PopIndent();
-        w.Line("}");
-        w.PopIndent();
-        w.Line("}");
-        w.Blank();
+        var name = rr.Name;
+        var wsSetup = ctx.PreserveWhitespace ? "" : "\n                    var ws = SkipWhitespace(remaining);\n                    remaining = remaining[ws..];";
+        var consumedExpr = ctx.PreserveWhitespace ? "Current.Length" : "ws + Current.Length";
+
+        w.Lines($$"""
+            // {{name}}{{QuantifierSuffix(rr.Quantifier)}} enumerable
+            public readonly ref struct {{name}}Enumerable
+            {
+                private readonly Input input;
+
+                public {{name}}Enumerable(Input input) => this.input = input;
+
+                public Enumerator GetEnumerator() => new(input);
+
+                public ref struct Enumerator
+                {
+                    private readonly Input input;
+                    private Int32 consumed;
+
+                    public Enumerator(Input input) => this.input = input;
+
+                    public {{name}} Current { get; private set; }
+
+                    public Boolean MoveNext()
+                    {
+                        var remaining = input[consumed..];{{wsSetup}}
+                        if (remaining.IsEmpty)
+                            return false;
+                        try
+                        {
+                            Current = new {{name}}(remaining);
+                            consumed += {{consumedExpr}};
+                            return true;
+                        }
+                        catch (ParseException)
+                        {
+                            return false;
+                        }
+                    }
+            """);
+        w.PushIndent(); w.PushIndent();
         EmitSkipWhitespace(ctx);
-        w.PopIndent();
-        w.Line("}");
-        w.PopIndent();
-        w.Line("}");
+        w.PopIndent(); w.PopIndent();
+        w.Lines("""
+                }
+            }
+            """);
     }
 
     // --- Epilogue ---
 
     static void EmitEpilogue(EmitContext ctx)
     {
-        var w = ctx.W;
-        w.Blank();
-        w.Line("// General-purpose tree printer");
-        w.Line("public struct TreePrinter(Int32 depth = 0) : IVisitor");
-        w.Line("{");
-        w.PushIndent();
-        w.Line("public void Visit<T>(in T rule) where T : IRule, allows ref struct");
-        w.Line("{");
-        w.PushIndent();
-        w.Line("var indent = new String(' ', depth * 2);");
-        w.Line("var checker = new ChildChecker();");
-        w.Line("rule.VisitChildren(ref checker);");
-        w.Blank();
-        w.Line("if (checker.HasChildren)");
-        w.Line("{");
-        w.PushIndent();
-        w.Line("Console.WriteLine($\"{indent}{typeof(T).Name}\");");
-        w.Line("var childPrinter = new TreePrinter(depth + 1);");
-        w.Line("rule.VisitChildren(ref childPrinter);");
-        w.PopIndent();
-        w.Line("}");
-        w.Line("else");
-        w.Line("{");
-        w.PushIndent();
-        w.Line("Console.WriteLine($\"{indent}{typeof(T).Name}: {rule.Text}\");");
-        w.PopIndent();
-        w.Line("}");
-        w.PopIndent();
-        w.Line("}");
-        w.PopIndent();
-        w.Line("}");
-        w.Blank();
-        w.Line("public struct ChildChecker : IVisitor");
-        w.Line("{");
-        w.PushIndent();
-        w.Line("public Boolean HasChildren { get; private set; }");
-        w.Blank();
-        w.Line("public void Visit<T>(in T rule) where T : IRule, allows ref struct");
-        w.Line("{");
-        w.PushIndent();
-        w.Line("HasChildren = true;");
-        w.PopIndent();
-        w.Line("}");
-        w.PopIndent();
-        w.Line("}");
-        w.Blank();
-        w.Line("public struct AncestorPrinter(List<String> ancestors, Int32 depth) : IVisitor");
-        w.Line("{");
-        w.PushIndent();
-        w.Line("public AncestorPrinter() : this(new List<String>(), 0) { }");
-        w.Blank();
-        w.Line("public void Visit<T>(in T rule) where T : IRule, allows ref struct");
-        w.Line("{");
-        w.PushIndent();
-        w.Line("var name = typeof(T).Name;");
-        w.Line("ancestors.Add(name);");
-        w.Blank();
-        w.Line("var indent = new String(' ', depth * 2);");
-        w.Line("var checker = new ChildChecker();");
-        w.Line("rule.VisitChildren(ref checker);");
-        w.Blank();
-        w.Line("if (checker.HasChildren)");
-        w.Line("{");
-        w.PushIndent();
-        w.Line("Console.WriteLine($\"{indent}{name}  [{String.Join(\" > \", ancestors)}]\");");
-        w.Line("var child = new AncestorPrinter(ancestors, depth + 1);");
-        w.Line("rule.VisitChildren(ref child);");
-        w.PopIndent();
-        w.Line("}");
-        w.Line("else");
-        w.Line("{");
-        w.PushIndent();
-        w.Line("Console.WriteLine($\"{indent}{name}: {rule.Text}  [{String.Join(\" > \", ancestors)}]\");");
-        w.PopIndent();
-        w.Line("}");
-        w.Blank();
-        w.Line("ancestors.RemoveAt(ancestors.Count - 1);");
-        w.PopIndent();
-        w.Line("}");
-        w.PopIndent();
-        w.Line("}");
+        ctx.W.Blank();
+        ctx.W.Lines("""
+            // General-purpose tree printer
+            public struct TreePrinter(Int32 depth = 0) : IVisitor
+            {
+                public void Visit<T>(in T rule) where T : IRule, allows ref struct
+                {
+                    var indent = new String(' ', depth * 2);
+                    var checker = new ChildChecker();
+                    rule.VisitChildren(ref checker);
+
+                    if (checker.HasChildren)
+                    {
+                        Console.WriteLine($"{indent}{typeof(T).Name}");
+                        var childPrinter = new TreePrinter(depth + 1);
+                        rule.VisitChildren(ref childPrinter);
+                    }
+                    else
+                    {
+                        Console.WriteLine($"{indent}{typeof(T).Name}: {rule.Text}");
+                    }
+                }
+            }
+
+            public struct ChildChecker : IVisitor
+            {
+                public Boolean HasChildren { get; private set; }
+
+                public void Visit<T>(in T rule) where T : IRule, allows ref struct
+                {
+                    HasChildren = true;
+                }
+            }
+
+            public struct AncestorPrinter(List<String> ancestors, Int32 depth) : IVisitor
+            {
+                public AncestorPrinter() : this(new List<String>(), 0) { }
+
+                public void Visit<T>(in T rule) where T : IRule, allows ref struct
+                {
+                    var name = typeof(T).Name;
+                    ancestors.Add(name);
+
+                    var indent = new String(' ', depth * 2);
+                    var checker = new ChildChecker();
+                    rule.VisitChildren(ref checker);
+
+                    if (checker.HasChildren)
+                    {
+                        Console.WriteLine($"{indent}{name}  [{String.Join(" > ", ancestors)}]");
+                        var child = new AncestorPrinter(ancestors, depth + 1);
+                        rule.VisitChildren(ref child);
+                    }
+                    else
+                    {
+                        Console.WriteLine($"{indent}{name}: {rule.Text}  [{String.Join(" > ", ancestors)}]");
+                    }
+
+                    ancestors.RemoveAt(ancestors.Count - 1);
+                }
+            }
+            """);
     }
 
     // --- Parent tracking ---
 
     static void EmitParentFields(EmitContext ctx)
     {
-        var w = ctx.W;
-        w.Line("private readonly Input parentInput;");
-        w.Line("private readonly Byte parentKind;");
+        ctx.W.Lines("""
+            private readonly Input parentInput;
+            private readonly Byte parentKind;
+            """);
     }
 
     static void EmitParentAssignment(EmitContext ctx)
     {
-        var w = ctx.W;
-        w.Line("this.parentInput = parentInput;");
-        w.Line("this.parentKind = parentKind;");
+        ctx.W.Lines("""
+            this.parentInput = parentInput;
+            this.parentKind = parentKind;
+            """);
     }
 
     static void EmitVisitParent(EmitContext ctx, Boolean qualifyIVisitor = false)
     {
-        var w = ctx.W;
         var constraint = qualifyIVisitor ? $"{ctx.Namespace}.IVisitor" : "IVisitor";
-        w.Line($"public void VisitParent<T>(ref T visitor) where T : {constraint}, allows ref struct");
-        w.Line("{");
-        w.PushIndent();
-        w.Line($"Rules.Visit(parentKind, parentInput, ref visitor);");
-        w.PopIndent();
-        w.Line("}");
+        ctx.W.Lines($$"""
+            public void VisitParent<T>(ref T visitor) where T : {{constraint}}, allows ref struct
+            {
+                Rules.Visit(parentKind, parentInput, ref visitor);
+            }
+            """);
     }
 
     static void EmitRulesDispatchClass(EmitContext ctx)
     {
         var w = ctx.W;
         w.Blank();
-        w.Line("public static class Rules");
-        w.Line("{");
-        w.PushIndent();
-        w.Line("public static void Visit<T>(Byte kind, Input input, ref T visitor) where T : IVisitor, allows ref struct");
-        w.Line("{");
-        w.PushIndent();
-        w.Line("switch (kind)");
-        w.Line("{");
-        w.PushIndent();
-        w.Line("case 0: break;");
+        w.Lines("""
+            public static class Rules
+            {
+                public static void Visit<T>(Byte kind, Input input, ref T visitor) where T : IVisitor, allows ref struct
+                {
+                    switch (kind)
+                    {
+                        case 0: break;
+            """);
+        w.PushIndent(); w.PushIndent(); w.PushIndent();
         foreach (var rule in ctx.SortedRules)
         {
             var id = ctx.GetRuleId(rule);
             w.Line($"case {id}: visitor.Visit(new {rule.Name}(input)); break;");
         }
-        w.PopIndent();
-        w.Line("}");
-        w.PopIndent();
-        w.Line("}");
-        w.PopIndent();
-        w.Line("}");
+        w.PopIndent(); w.PopIndent(); w.PopIndent();
+        w.Lines("""
+                    }
+                }
+            }
+            """);
     }
 
     static String ConstructorParams() => "Input input, Input parentInput = default, Byte parentKind = 0";
-
-    static String ChildArgs(String inputExpr, EmitContext ctx, Rule parentRule) =>
-        $"{inputExpr}, input, {ctx.GetRuleId(parentRule)}";
 
     // --- Shared helpers ---
 
@@ -1778,18 +1748,15 @@ public static class CodeEmitter
     {
         if (ctx.PreserveWhitespace)
             return;
-        var w = ctx.W;
-        w.Line("private static Int32 SkipWhitespace(Input input)");
-        w.Line("{");
-        w.PushIndent();
-        w.Line("var i = 0;");
-        w.Line("while (i < input.Length && Char.IsWhiteSpace(input[i]))");
-        w.PushIndent();
-        w.Line("i++;");
-        w.PopIndent();
-        w.Line("return i;");
-        w.PopIndent();
-        w.Line("}");
+        ctx.W.Lines("""
+            private static Int32 SkipWhitespace(Input input)
+            {
+                var i = 0;
+                while (i < input.Length && Char.IsWhiteSpace(input[i]))
+                    i++;
+                return i;
+            }
+            """);
     }
 
     static void EmitSkipWs(EmitContext ctx)
@@ -1888,6 +1855,27 @@ public static class CodeEmitter
             else
             {
                 sb.AppendLine();
+            }
+        }
+
+        public void Lines(String text)
+        {
+            var lines = text.Split('\n');
+            var minIndent = lines
+                .Where(l => l.TrimStart().Length > 0)
+                .Select(l => l.Length - l.TrimStart().Length)
+                .DefaultIfEmpty(0)
+                .Min();
+            foreach (var line in lines)
+            {
+                var trimmed = line.Length >= minIndent ? line[minIndent..] : line.TrimStart();
+                if (trimmed.Length == 0)
+                    sb.AppendLine();
+                else
+                {
+                    sb.Append(' ', indent * 4);
+                    sb.AppendLine(trimmed);
+                }
             }
         }
 
