@@ -29,6 +29,9 @@ public static class CodeEmitter
                 case RuleKind.Alternative:
                     EmitAlternativeRule(rule, ctx);
                     break;
+                case RuleKind.MixedAlternative:
+                    EmitMixedAlternativeRule(rule, ctx);
+                    break;
             }
         }
 
@@ -37,7 +40,7 @@ public static class CodeEmitter
         return w.ToString();
     }
 
-    enum RuleKind { Terminal, Sequence, Alternative }
+    enum RuleKind { Terminal, Sequence, Alternative, MixedAlternative }
 
     sealed class EmitContext
     {
@@ -108,6 +111,8 @@ public static class CodeEmitter
                 map[rule] = RuleKind.Alternative;
             else if (IsTerminalRule(rule))
                 map[rule] = RuleKind.Terminal;
+            else if (rule.Alternatives.Count > 1)
+                map[rule] = RuleKind.MixedAlternative;
             else
                 map[rule] = RuleKind.Sequence;
         }
@@ -209,7 +214,7 @@ public static class CodeEmitter
     static void EmitRuleComment(Rule rule, EmitContext ctx)
     {
         var kind = ctx.GetKind(rule);
-        if (kind == RuleKind.Alternative)
+        if (kind is RuleKind.Alternative or RuleKind.MixedAlternative)
         {
             ctx.W.Line($"// {rule.Name}");
             foreach (var alt in rule.Alternatives)
@@ -1150,6 +1155,194 @@ public static class CodeEmitter
         w.Line("}");
         w.PopIndent();
         w.Line("}");
+    }
+
+    // --- Mixed alternative rules ---
+
+    static void EmitMixedAlternativeRule(Rule rule, EmitContext ctx)
+    {
+        var w = ctx.W;
+
+        w.Line($"public readonly ref struct {rule.Name} : IRule");
+        w.Line("{");
+        w.PushIndent();
+        w.Lines("""
+            private readonly Input input;
+            private readonly Input parentInput;
+            private readonly Byte parentKind;
+            private readonly Byte index;
+            public Int32 Length { get; }
+            """);
+        w.Blank();
+        w.Line($"public {rule.Name}({ConstructorParams()})");
+        w.Line("{");
+        w.PushIndent();
+        w.Lines("""
+            this.input = input;
+            this.parentInput = parentInput;
+            this.parentKind = parentKind;
+            """);
+
+        for (var i = 0; i < rule.Alternatives.Count; i++)
+        {
+            var alt = rule.Alternatives[i];
+            var isLast = i == rule.Alternatives.Count - 1;
+
+            if (!isLast)
+            {
+                w.Line("try");
+                w.Line("{");
+                w.PushIndent();
+            }
+
+            EmitMixedAlternativeBody(alt, i + 1, ctx);
+
+            if (!isLast)
+            {
+                w.PopIndent();
+                w.Line("}");
+                w.Line("catch (ParseException)");
+                w.Line("{");
+                w.PushIndent();
+            }
+        }
+
+        for (var i = 0; i < rule.Alternatives.Count - 1; i++)
+        {
+            w.PopIndent();
+            w.Line("}");
+        }
+
+        w.PopIndent();
+        w.Line("}");
+        w.Blank();
+        w.Lines("""
+            public Input Text => input[..Length];
+
+            public void VisitChildren<T>(ref T visitor) where T : IVisitor, allows ref struct { }
+            """);
+        w.Blank();
+        EmitVisitParent(ctx);
+        if (rule.Alternatives.Any(a => a.Items.Any(i => i is Class)))
+            EmitCharClassHelperMethods(rule, ctx);
+        w.PopIndent();
+        w.Line("}");
+    }
+
+    static void EmitMixedAlternativeBody(Alternative alt, Int32 index, EmitContext ctx)
+    {
+        var w = ctx.W;
+        var items = alt.Items;
+
+        if (items.Count == 1 && items[0] is not RuleRef)
+        {
+            EmitSingleItemTerminal(items[0], ctx);
+            w.Line($"index = {index};");
+            return;
+        }
+
+        w.Line("var pos = 0;");
+        var varCounts = new Dictionary<String, Int32>();
+        foreach (var item in items)
+        {
+            if (item is Literal<String> ls)
+            {
+                if (ls.Value.Length == 1)
+                {
+                    w.Line($"if (pos >= input.Length || input[pos] != '{EscapeChar(ls.Value[0])}')");
+                    w.PushIndent();
+                    w.Line("throw new ParseException(new ParseError());");
+                    w.PopIndent();
+                    w.Line("pos += 1;");
+                }
+                else
+                {
+                    w.Line($"if (!input[pos..].StartsWith(\"{EscapeString(ls.Value)}\"))");
+                    w.PushIndent();
+                    w.Line("throw new ParseException(new ParseError());");
+                    w.PopIndent();
+                    w.Line($"pos += {ls.Value.Length};");
+                }
+            }
+            else if (item is RuleRef rr)
+            {
+                varCounts.TryGetValue(rr.Name, out var count);
+                varCounts[rr.Name] = count + 1;
+                var varName = count == 0 ? CamelCase(rr.Name) : $"{CamelCase(rr.Name)}{count + 1}";
+                var q = rr.Quantifier;
+                if (q is { Min: 1, Max: 1 })
+                {
+                    w.Line($"var {varName} = new {rr.Name}(input[pos..]);");
+                    w.Line($"pos += {varName}.Length;");
+                }
+                else if (q is { Min: 0, Max: 1 })
+                {
+                    w.Line("try");
+                    w.Line("{");
+                    w.PushIndent();
+                    w.Line($"var {varName} = new {rr.Name}(input[pos..]);");
+                    w.Line($"pos += {varName}.Length;");
+                    w.PopIndent();
+                    w.Line("}");
+                    w.Line("catch (ParseException) { }");
+                }
+                else if (q.Max == null)
+                {
+                    if (q.Min >= 1)
+                    {
+                        w.Line($"var first{rr.Name} = new {rr.Name}(input[pos..]);");
+                        w.Line($"pos += first{rr.Name}.Length;");
+                    }
+                    w.Line("while (true)");
+                    w.Line("{");
+                    w.PushIndent();
+                    w.Line("try");
+                    w.Line("{");
+                    w.PushIndent();
+                    w.Line($"var next{rr.Name} = new {rr.Name}(input[pos..]);");
+                    w.Line($"pos += next{rr.Name}.Length;");
+                    w.PopIndent();
+                    w.Line("}");
+                    w.Line("catch (ParseException) { break; }");
+                    w.PopIndent();
+                    w.Line("}");
+                }
+            }
+            else if (item is Class c)
+            {
+                var helperName = GetClassHelperName(c);
+                var q = c.Quantifier;
+                if (q is { Min: 1, Max: 1 })
+                {
+                    w.Line($"if (pos >= input.Length || !{helperName}(input[pos]))");
+                    w.PushIndent();
+                    w.Line("throw new ParseException(new ParseError());");
+                    w.PopIndent();
+                    w.Line("pos += 1;");
+                }
+                else if (q is { Min: 1, Max: null })
+                {
+                    w.Line($"if (pos >= input.Length || !{helperName}(input[pos]))");
+                    w.PushIndent();
+                    w.Line("throw new ParseException(new ParseError());");
+                    w.PopIndent();
+                    w.Line("pos += 1;");
+                    w.Line($"while (pos < input.Length && {helperName}(input[pos]))");
+                    w.PushIndent();
+                    w.Line("pos += 1;");
+                    w.PopIndent();
+                }
+                else if (q is { Min: 0, Max: null })
+                {
+                    w.Line($"while (pos < input.Length && {helperName}(input[pos]))");
+                    w.PushIndent();
+                    w.Line("pos += 1;");
+                    w.PopIndent();
+                }
+            }
+        }
+        w.Line($"index = {index};");
+        w.Line("Length = pos;");
     }
 
     // --- Alternative rules ---
